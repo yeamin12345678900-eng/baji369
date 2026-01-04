@@ -1,0 +1,8 @@
+{
+  "name": "Baji369 Pro Gaming Login",
+  "description": "A high-fidelity gaming portal featuring advanced betting logs, real-time balance sync, and premium VIP tracking.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
