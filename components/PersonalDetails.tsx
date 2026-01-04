@@ -23,14 +23,17 @@ const PersonalDetails: React.FC<PersonalDetailsProps> = ({ onBack, user }) => {
 
   useEffect(() => {
     const fetchProfile = async () => {
-      if (!user) {
+      // Safety check for user
+      const userId = (user as any)?.id;
+      if (!userId) {
         setIsLoading(false);
         return;
       }
+      
       setIsLoading(true);
       setError(null);
       try {
-        const { data, error: fetchError } = await getUserProfile(user.id);
+        const { data, error: fetchError } = await getUserProfile(userId);
         const profileData = data as any;
         if (profileData) {
           setFirstName(profileData.first_name || '');
@@ -53,7 +56,8 @@ const PersonalDetails: React.FC<PersonalDetailsProps> = ({ onBack, user }) => {
   }, [user]);
 
   const handleSave = async () => {
-    if (!user) {
+    const userId = (user as any)?.id;
+    if (!userId) {
       setError("User not authenticated.");
       return;
     }
@@ -74,7 +78,7 @@ const PersonalDetails: React.FC<PersonalDetailsProps> = ({ onBack, user }) => {
     };
 
     try {
-      const { data, error: updateError } = await updateUserProfile(user.id, updates);
+      const { data, error: updateError } = await updateUserProfile(userId, updates);
       
       if (updateError) {
         setError(`Update Failed: ${updateError.message}`);

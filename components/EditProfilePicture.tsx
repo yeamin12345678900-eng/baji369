@@ -39,12 +39,14 @@ const EditProfilePicture: React.FC<EditProfilePictureProps> = ({ user, currentAv
   };
 
   const handleSave = async () => {
-    if (!user) return;
+    const userId = (user as any)?.id;
+    if (!userId) return;
+    
     setIsSaving(true);
     setError(null);
     
     try {
-      const { error: updateError } = await updateUserProfile(user.id, { 
+      const { error: updateError } = await updateUserProfile(userId, { 
         avatar_url: previewUrl,
         updated_at: new Date().toISOString()
       });
