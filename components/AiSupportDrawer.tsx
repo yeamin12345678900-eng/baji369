@@ -19,6 +19,7 @@ const AiSupportDrawer: React.FC<AiSupportDrawerProps> = ({ isOpen, onClose }) =>
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isConfigured, setIsConfigured] = useState(true);
   const chatRef = useRef<any>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -26,8 +27,16 @@ const AiSupportDrawer: React.FC<AiSupportDrawerProps> = ({ isOpen, onClose }) =>
     if (isOpen && !chatRef.current) {
       try {
         chatRef.current = startChat();
-      } catch (err) {
-        console.error("Failed to start AI chat", err);
+        setIsConfigured(true);
+      } catch (err: any) {
+        if (err.message === "API_KEY_MISSING") {
+          setIsConfigured(false);
+          setMessages([{ 
+            role: 'model', 
+            text: 'আমাদের AI অ্যাসিস্ট্যান্ট বর্তমানে কনফিগার করা নেই। অনুগ্রহ করে অ্যাডমিনকে এপিআই কি (API_KEY) চেক করতে বলুন।' 
+          }]);
+        }
+        console.error("AI Initialization Error:", err);
       }
     }
   }, [isOpen]);
@@ -39,7 +48,7 @@ const AiSupportDrawer: React.FC<AiSupportDrawerProps> = ({ isOpen, onClose }) =>
   }, [messages, isLoading]);
 
   const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+    if (!input.trim() || isLoading || !isConfigured) return;
 
     const userMessage: Message = { role: 'user', text: input };
     setMessages(prev => [...prev, userMessage]);
@@ -56,7 +65,7 @@ const AiSupportDrawer: React.FC<AiSupportDrawerProps> = ({ isOpen, onClose }) =>
       }
     } catch (error) {
       console.error("AI Chat Error:", error);
-      setMessages(prev => [...prev, { role: 'model', text: "Sorry, I encountered an error. Please try again later." }]);
+      setMessages(prev => [...prev, { role: 'model', text: "Sorry, I encountered an error. Please check your connection or API key." }]);
     } finally {
       setIsLoading(false);
     }
@@ -77,8 +86,10 @@ const AiSupportDrawer: React.FC<AiSupportDrawerProps> = ({ isOpen, onClose }) =>
             <div>
               <h3 className="font-bold text-lg text-slate-900 dark:text-white">Baji369 AI Assistant</h3>
               <div className="flex items-center gap-1.5">
-                <div className="size-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-xs text-slate-500 dark:text-slate-400">Always online</span>
+                <div className={`size-2 rounded-full ${isConfigured ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
+                <span className="text-xs text-slate-500 dark:text-slate-400">
+                  {isConfigured ? 'Always online' : 'Configuration Error'}
+                </span>
               </div>
             </div>
           </div>
@@ -119,14 +130,15 @@ const AiSupportDrawer: React.FC<AiSupportDrawerProps> = ({ isOpen, onClose }) =>
           <div className="relative flex items-center gap-2">
             <input 
               value={input}
+              disabled={!isConfigured}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-              placeholder="Ask me anything about Baji369..."
-              className="w-full pl-4 pr-12 py-3.5 bg-white dark:bg-surface-dark border border-slate-200 dark:border-white/10 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 text-slate-900 dark:text-white"
+              placeholder={isConfigured ? "Ask me anything..." : "Assistant is offline"}
+              className="w-full pl-4 pr-12 py-3.5 bg-white dark:bg-surface-dark border border-slate-200 dark:border-white/10 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 text-slate-900 dark:text-white disabled:opacity-50"
             />
             <button 
               onClick={handleSend}
-              disabled={isLoading || !input.trim()}
+              disabled={isLoading || !input.trim() || !isConfigured}
               className="absolute right-1.5 bg-primary text-white size-10 rounded-full flex items-center justify-center disabled:opacity-50 transition-all hover:scale-105 active:scale-95"
             >
               <span className="material-symbols-outlined">send</span>
