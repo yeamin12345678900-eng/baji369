@@ -54,7 +54,9 @@ export const translations = {
     aboutUs: "About Us",
     legal: "Legal",
     terms: "Terms & Conditions",
-    privacy: "Privacy Policy"
+    privacy: "Privacy Policy",
+    downloadApp: "Download App",
+    installMobile: "Install Mobile App"
   },
   bn: {
     home: "হোম",
@@ -110,7 +112,9 @@ export const translations = {
     aboutUs: "আমাদের সম্পর্কে",
     legal: "আইনি তথ্যাবলি",
     terms: "শর্তাবলী",
-    privacy: "প্রাইভেসি পলিসি"
+    privacy: "প্রাইভেসি পলিসি",
+    downloadApp: "অ্যাপ ডাউনলোড",
+    installMobile: "মোবাইল অ্যাপ ইন্সটল"
   }
 };
 

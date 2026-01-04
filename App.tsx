@@ -50,6 +50,7 @@ const App: React.FC = () => {
   const [isDemo, setIsDemo] = useState(false);
   const [showSpin, setShowSpin] = useState(false);
   const [activeToast, setActiveToast] = useState<{title: string, desc: string} | null>(null);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
   const [gameStatus, setGameStatus] = useState<Record<string, boolean>>({
     'crash-game': true, 'aviator-game': true, 'crazy777-game': true, 'mines-game': true,
@@ -63,6 +64,12 @@ const App: React.FC = () => {
   useEffect(() => {
     const savedLang = localStorage.getItem('appLang') as Language;
     if (savedLang) setLang(savedLang);
+
+    // Listen for PWA installation prompt
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
@@ -126,6 +133,22 @@ const App: React.FC = () => {
     }
   };
 
+  const handleInstallApp = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setDeferredPrompt(null);
+      }
+    } else {
+      const msg = lang === 'en' 
+        ? "To install: Tap the Browser Menu (3 dots) and select 'Install App' or 'Add to Home Screen'."
+        : "অ্যাপটি ইন্সটল করতে: আপনার ব্রাউজারের ৩-ডট মেনুতে ক্লিক করে 'Install App' অথবা 'Add to Home Screen' সিলেক্ট করুন।";
+      setActiveToast({ title: "App Installation", desc: msg });
+      setTimeout(() => setActiveToast(null), 6000);
+    }
+  };
+
   const updateBalance = async (newBalance: number) => {
     setBalance(newBalance);
     if (user && !isDemo) {
@@ -168,11 +191,11 @@ const App: React.FC = () => {
           <div onClick={() => setActiveToast(null)} className="absolute top-6 left-6 right-6 z-[300] animate-in slide-in-from-top duration-500 cursor-pointer">
              <div className="bg-[#24191a]/95 backdrop-blur-xl border border-primary/30 p-4 rounded-2xl flex items-center gap-4 shadow-2xl">
                 <div className="size-10 rounded-full bg-primary flex items-center justify-center shrink-0">
-                   <span className="material-symbols-outlined text-white text-xl">warning</span>
+                   <span className="material-symbols-outlined text-white text-xl">info</span>
                 </div>
                 <div className="flex-1">
                    <p className="text-white text-xs font-black uppercase tracking-tight mb-1">{activeToast.title}</p>
-                   <p className="text-slate-400 text-[10px] font-bold">{activeToast.desc}</p>
+                   <p className="text-slate-400 text-[10px] font-bold leading-tight">{activeToast.desc}</p>
                 </div>
              </div>
           </div>
@@ -193,7 +216,7 @@ const App: React.FC = () => {
           {currentView === 'withdraw' && <Withdraw lang={lang} balance={balance} onBack={() => navigate('wallet')} onWithdrawSuccess={(amt) => { updateBalance(balance - amt); navigate('wallet'); }} />}
           {currentView === 'notifications' && <Notifications lang={lang} onBack={() => navigate('dashboard')} />}
           {currentView === 'my-bets' && <MyBets lang={lang} user={user} onBack={() => navigate('dashboard')} onNavigateHome={() => navigate('dashboard')} />}
-          {currentView === 'profile' && <ProfileSettings lang={lang} userProfile={profile} onBack={() => navigate('dashboard')} onLogout={async () => { await supabase.auth.signOut(); navigate('login'); }} onLanguageToggle={() => { setLang(lang === 'en' ? 'bn' : 'en'); }} onEditProfile={() => navigate('edit-profile')} onPersonalDetails={() => navigate('personal-details')} onVerificationCenter={() => navigate('verification-center')} onChangePassword={() => navigate('change-password')} onVipRewards={() => navigate('vip-rewards')} onHelpSupport={() => navigate('help-support')} onAboutUs={() => navigate('about-us')} onTerms={() => navigate('terms')} onPrivacy={() => navigate('privacy')} onAdminPanel={profile?.role === 'admin' ? () => navigate('admin') : undefined} />}
+          {currentView === 'profile' && <ProfileSettings lang={lang} userProfile={profile} onBack={() => navigate('dashboard')} onLogout={async () => { await supabase.auth.signOut(); navigate('login'); }} onLanguageToggle={() => { setLang(lang === 'en' ? 'bn' : 'en'); }} onEditProfile={() => navigate('edit-profile')} onPersonalDetails={() => navigate('personal-details')} onVerificationCenter={() => navigate('verification-center')} onChangePassword={() => navigate('change-password')} onVipRewards={() => navigate('vip-rewards')} onHelpSupport={() => navigate('help-support')} onAboutUs={() => navigate('about-us')} onTerms={() => navigate('terms')} onPrivacy={() => navigate('privacy')} onAdminPanel={profile?.role === 'admin' ? () => navigate('admin') : undefined} onDownloadApp={handleInstallApp} />}
           {currentView === 'personal-details' && <PersonalDetails onBack={() => navigate('profile')} user={user} />}
           {currentView === 'verification-center' && <VerificationCenter onBack={() => navigate('profile')} />}
           {currentView === 'change-password' && <ChangePassword onBack={() => navigate('profile')} />}

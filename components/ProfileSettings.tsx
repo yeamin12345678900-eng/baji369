@@ -18,6 +18,7 @@ interface ProfileSettingsProps {
   onTerms?: () => void;
   onPrivacy?: () => void;
   onAdminPanel?: () => void;
+  onDownloadApp?: () => void;
 }
 
 const SettingItem = ({ icon, label, onClick, badge, color = "text-white", iconColor = "bg-white/5", iconText = "text-slate-400" }: any) => (
@@ -35,14 +36,13 @@ const SettingItem = ({ icon, label, onClick, badge, color = "text-white", iconCo
   </button>
 );
 
-// Fix: Explicitly use React.FC with PropsWithChildren to ensure children are recognized as optional in the props object during JSX transpilation
 const SectionTitle: React.FC<React.PropsWithChildren<{}>> = ({ children }) => (
   <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-5 mb-3 mt-8">{children}</h3>
 );
 
 const ProfileSettings: React.FC<ProfileSettingsProps> = ({ 
   lang, userProfile, onBack, onLogout, onLanguageToggle, onEditProfile, onPersonalDetails, onVerificationCenter, 
-  onChangePassword, onVipRewards, onHelpSupport, onAboutUs, onTerms, onPrivacy, onAdminPanel 
+  onChangePassword, onVipRewards, onHelpSupport, onAboutUs, onTerms, onPrivacy, onAdminPanel, onDownloadApp 
 }) => {
   const t = translations[lang];
   const userName = userProfile ? `${userProfile.first_name || ''} ${userProfile.last_name || 'Player'}`.trim() : "Guest Player";
@@ -91,6 +91,19 @@ const ProfileSettings: React.FC<ProfileSettingsProps> = ({
         <div className="bg-white/[0.03] border border-white/5 rounded-3xl overflow-hidden divide-y divide-white/5 shadow-2xl">
           <SettingItem icon="verified_user" label={t.verification} onClick={onVerificationCenter} iconColor="bg-orange-500/10" iconText="text-orange-500" />
           <SettingItem icon="lock" label={t.changePass} onClick={onChangePassword} iconColor="bg-indigo-500/10" iconText="text-indigo-500" />
+        </div>
+
+        {/* App Section */}
+        <SectionTitle>Application</SectionTitle>
+        <div className="bg-white/[0.03] border border-white/5 rounded-3xl overflow-hidden shadow-2xl">
+          <SettingItem 
+            icon="install_mobile" 
+            label={t.installMobile} 
+            badge="FREE" 
+            onClick={onDownloadApp} 
+            iconColor="bg-primary/20" 
+            iconText="text-primary" 
+          />
         </div>
 
         {/* Rewards & Support */}
