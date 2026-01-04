@@ -37,7 +37,6 @@ import AboutUs from './components/AboutUs';
 import TermsConditions from './components/TermsConditions';
 import PrivacyPolicy from './components/PrivacyPolicy';
 import EditProfilePicture from './components/EditProfilePicture';
-import AiSupportDrawer from './components/AiSupportDrawer';
 import GameDetail from './components/GameDetail';
 
 export type ViewType = 'login' | 'register' | 'forgot-password' | 'reset-password' | 'dashboard' | 'sports' | 'casino' | 'game-detail' | 'promotions' | 'wallet' | 'deposit' | 'withdraw' | 'profile' | 'edit-profile' | 'personal-details' | 'verification-center' | 'change-password' | 'my-bets' | 'vip-rewards' | 'notifications' | 'help-support' | 'mini-games' | 'crash-game' | 'aviator-game' | 'crazy777-game' | 'mines-game' | 'penalty-game' | 'limbo-game' | 'dice-game' | 'plinko-game' | 'admin' | 'about-us' | 'terms' | 'privacy';
@@ -50,7 +49,6 @@ const App: React.FC = () => {
   const [balance, setBalance] = useState(0); 
   const [isDemo, setIsDemo] = useState(false);
   const [showSpin, setShowSpin] = useState(false);
-  const [showAiSupport, setShowAiSupport] = useState(false);
   const [activeToast, setActiveToast] = useState<{title: string, desc: string} | null>(null);
 
   const [gameStatus, setGameStatus] = useState<Record<string, boolean>>({
@@ -155,7 +153,6 @@ const App: React.FC = () => {
 
   const isAuthView = ['login', 'register', 'forgot-password', 'reset-password'].includes(currentView);
   
-  // Wallet is no longer "full screen" because it's a primary tab now
   const isFullScreen = [
     'crash-game', 'aviator-game', 'crazy777-game', 'mines-game', 'penalty-game', 'limbo-game', 'dice-game', 'plinko-game',
     'personal-details', 'verification-center', 'change-password', 'edit-profile', 'game-detail',
@@ -208,7 +205,6 @@ const App: React.FC = () => {
           {currentView === 'privacy' && <PrivacyPolicy onBack={() => navigate('profile')} />}
           {currentView === 'admin' && <AdminPanel onBack={() => navigate('profile')} settings={riggingSettings} onUpdateSettings={setRiggingSettings} gameStatus={gameStatus} onUpdateGameStatus={setGameStatus} />}
           
-          {/* Mini Games */}
           {currentView === 'mini-games' && <MiniGamesHub onNavigate={navigate} gameStatus={gameStatus} />}
           {currentView === 'crash-game' && <CrashGame balance={balance} onUpdateBalance={updateBalance} onSaveBet={handleSaveBet} riggingIntensity={riggingSettings.crash} onBack={() => navigate('mini-games')} />}
           {currentView === 'aviator-game' && <AviatorGame balance={balance} onUpdateBalance={updateBalance} onSaveBet={handleSaveBet} riggingIntensity={riggingSettings.aviator} onBack={() => navigate('mini-games')} />}
@@ -220,21 +216,9 @@ const App: React.FC = () => {
           {currentView === 'plinko-game' && <PlinkoGame balance={balance} onUpdateBalance={updateBalance} onSaveBet={handleSaveBet} riggingIntensity={riggingSettings.plinko} onBack={() => navigate('mini-games')} />}
         </div>
 
-        {/* Overlays */}
         {showSpin && <DailySpin onWin={(amt) => updateBalance(balance + amt)} onClose={() => setShowSpin(false)} />}
-        <AiSupportDrawer isOpen={showAiSupport} onClose={() => setShowAiSupport(false)} />
 
         {!isAuthView && !isFullScreen && <BottomNav lang={lang} currentView={currentView} onNavigate={navigate} />}
-        
-        {/* Floating Support Button on Dashboard */}
-        {currentView === 'dashboard' && (
-          <button 
-            onClick={() => setShowAiSupport(true)}
-            className="fixed bottom-24 right-6 size-14 bg-primary rounded-full shadow-2xl flex items-center justify-center text-white z-40 active:scale-90 transition-transform"
-          >
-            <span className="material-symbols-outlined text-3xl">smart_toy</span>
-          </button>
-        )}
       </div>
     </div>
   );
