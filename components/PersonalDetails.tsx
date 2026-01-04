@@ -31,20 +31,19 @@ const PersonalDetails: React.FC<PersonalDetailsProps> = ({ onBack, user }) => {
       setError(null);
       try {
         const { data, error: fetchError } = await getUserProfile(user.id);
-        if (data) {
-          setFirstName(data.first_name || '');
-          setLastName(data.last_name || '');
-          setDob(data.date_of_birth || '');
-          setAddress(data.address || '');
-          setCity(data.city || '');
-          setState(data.state || '');
-          setZip(data.zip_code || '');
+        const profileData = data as any;
+        if (profileData) {
+          setFirstName(profileData.first_name || '');
+          setLastName(profileData.last_name || '');
+          setDob(profileData.date_of_birth || '');
+          setAddress(profileData.address || '');
+          setCity(profileData.city || '');
+          setState(profileData.state || '');
+          setZip(profileData.zip_code || '');
         } else if (fetchError) {
-          console.error("Profile Fetch Error:", fetchError);
           setError(fetchError?.message || "Could not fetch profile.");
         }
       } catch (e: any) {
-        console.error("Fetch Exception:", e);
         setError(e?.message || "An unexpected error occurred.");
       } finally {
         setIsLoading(false);
@@ -78,18 +77,13 @@ const PersonalDetails: React.FC<PersonalDetailsProps> = ({ onBack, user }) => {
       const { data, error: updateError } = await updateUserProfile(user.id, updates);
       
       if (updateError) {
-        console.error("Update Error:", updateError);
-        setError(`Update Failed: ${updateError.message}. Make sure RLS policies are set in Supabase.`);
-      } else if (!data || data.length === 0) {
-        setError("Update failed: No rows affected. Check your database permissions (RLS).");
+        setError(`Update Failed: ${updateError.message}`);
       } else {
         setShowSuccess(true);
-        // Sync local storage or state if needed, but let's just go back
         setTimeout(() => onBack(), 1500);
       }
     } catch (e: any) {
-      console.error("Exception during update:", e);
-      setError(`Unexpected Error: ${e?.message || "Please check your internet connection."}`);
+      setError(`Unexpected Error: ${e?.message}`);
     } finally {
       setIsSaving(false);
     }
@@ -106,7 +100,6 @@ const PersonalDetails: React.FC<PersonalDetailsProps> = ({ onBack, user }) => {
 
   return (
     <div className="flex flex-col h-full bg-[#0d0909] animate-in slide-in-from-right duration-500 overflow-hidden font-display relative">
-      {/* Header */}
       <div className="sticky top-0 z-50 flex items-center bg-[#0d0909]/95 backdrop-blur-md p-4 border-b border-white/5 shadow-lg">
         <button onClick={onBack} className="text-white size-10 flex items-center justify-center rounded-full hover:bg-white/5 active:scale-90 transition-transform">
           <span className="material-symbols-outlined">arrow_back_ios_new</span>
@@ -114,7 +107,6 @@ const PersonalDetails: React.FC<PersonalDetailsProps> = ({ onBack, user }) => {
         <h2 className="text-white text-lg font-black uppercase tracking-tight flex-1 text-center pr-10">Personal Details</h2>
       </div>
 
-      {/* Main Content Area */}
       <div className="flex-1 overflow-y-auto p-6 space-y-6 pb-40 no-scrollbar">
         {showSuccess && (
           <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[10px] font-black uppercase tracking-widest text-center rounded-2xl animate-in zoom-in">
@@ -199,7 +191,6 @@ const PersonalDetails: React.FC<PersonalDetailsProps> = ({ onBack, user }) => {
           />
         </label>
 
-        {/* Info Box */}
         <div className="p-4 bg-white/[0.03] border border-white/5 rounded-2xl flex gap-3">
           <span className="material-symbols-outlined text-primary text-[20px]">info</span>
           <p className="text-[10px] text-slate-500 font-bold leading-relaxed">
@@ -208,7 +199,6 @@ const PersonalDetails: React.FC<PersonalDetailsProps> = ({ onBack, user }) => {
         </div>
       </div>
 
-      {/* Floating Save Button Footer */}
       <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-[#0d0909] via-[#0d0909] to-transparent border-t border-white/5 z-50">
         <button 
           onClick={handleSave} 

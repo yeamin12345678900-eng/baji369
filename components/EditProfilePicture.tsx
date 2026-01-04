@@ -50,8 +50,10 @@ const EditProfilePicture: React.FC<EditProfilePictureProps> = ({ user, currentAv
       });
 
       if (updateError) {
-        // Detect specific PostgREST missing column error
-        if (updateError.message.includes('avatar_url') || updateError.code === '42703') {
+        const msg = (updateError as any).message || '';
+        const code = (updateError as any).code || '';
+        
+        if (msg.includes('avatar_url') || code === '42703') {
           setError({
             title: "Database Column Missing",
             msg: "The 'avatar_url' column is missing in your Supabase 'profiles' table. Please run the SQL migration in your Supabase SQL Editor."
@@ -84,7 +86,6 @@ const EditProfilePicture: React.FC<EditProfilePictureProps> = ({ user, currentAv
         className="hidden" 
       />
 
-      {/* Header */}
       <div className="sticky top-0 z-20 bg-background-dark/95 backdrop-blur-md border-b border-white/5 shadow-xl">
         <div className="flex items-center justify-between p-4">
           <button 
@@ -97,7 +98,6 @@ const EditProfilePicture: React.FC<EditProfilePictureProps> = ({ user, currentAv
         </div>
       </div>
 
-      {/* Main Content */}
       <main className="flex-1 flex flex-col items-center pt-10 px-6 overflow-y-auto no-scrollbar">
         {error && (
           <div className="w-full mb-8 p-5 bg-red-500/10 border border-red-500/20 rounded-[2rem] animate-in zoom-in duration-300">
@@ -116,7 +116,6 @@ const EditProfilePicture: React.FC<EditProfilePictureProps> = ({ user, currentAv
           </div>
         )}
 
-        {/* Avatar Preview Section */}
         <div className="relative group/avatar cursor-pointer mb-10" onClick={triggerFileInput}>
           <div className="relative rounded-full p-1.5 bg-gradient-to-tr from-primary to-orange-500 shadow-[0_0_50px_rgba(234,42,51,0.2)]">
             <div 
@@ -136,7 +135,6 @@ const EditProfilePicture: React.FC<EditProfilePictureProps> = ({ user, currentAv
           <p className="text-slate-500 text-xs font-bold uppercase tracking-[0.2em] mt-2">Personalize your gaming profile</p>
         </div>
 
-        {/* Info Card */}
         <div className="w-full max-w-sm p-6 bg-white/[0.03] border border-white/5 rounded-[2.5rem] flex flex-col gap-4">
           <div className="flex items-center gap-4">
             <div className="size-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500">
@@ -156,7 +154,6 @@ const EditProfilePicture: React.FC<EditProfilePictureProps> = ({ user, currentAv
         </div>
       </main>
 
-      {/* Action Footer */}
       <div className="p-6 pb-10 bg-[#0d0909] border-t border-white/5 mt-auto shadow-[0_-20px_50px_rgba(0,0,0,0.5)]">
         <button 
           onClick={handleSave}
