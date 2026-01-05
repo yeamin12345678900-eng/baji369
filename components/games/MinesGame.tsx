@@ -118,19 +118,19 @@ const MinesGame: React.FC<MinesGameProps> = ({ balance, onUpdateBalance, onSaveB
   };
 
   return (
-    <div className="flex flex-col h-[100dvh] bg-[#0d0909] font-display overflow-hidden select-none relative">
+    <div className="flex flex-col min-h-screen bg-[#0d0909] font-display overflow-y-auto no-scrollbar select-none relative">
       
-      {/* Mine Background */}
-      <div className="absolute inset-0 z-0">
+      {/* Background stays static but can be overlaid */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
         <div 
           className="absolute inset-0 bg-cover bg-center"
           style={{ backgroundImage: `url("${BACKGROUND_URL}")` }}
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0d0909]/90 via-transparent to-[#0d0909]"></div>
-        <div className="absolute inset-0 bg-amber-900/10 backdrop-blur-[2px]"></div>
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0d0909]/95 via-[#0d0909]/40 to-[#0d0909]"></div>
       </div>
 
-      <header className="p-4 flex items-center justify-between border-b border-white/5 bg-black/40 z-20 backdrop-blur-md">
+      {/* Sticky Header */}
+      <header className="sticky top-0 z-50 p-4 flex items-center justify-between border-b border-white/5 bg-black/60 backdrop-blur-xl">
         <button onClick={onBack} className="text-slate-400 size-10 flex items-center justify-center rounded-full active:bg-white/5"><span className="material-symbols-outlined">arrow_back</span></button>
         <div className="text-center">
             <h2 className="text-white font-black uppercase text-[10px] tracking-widest leading-none mb-1">Mines Elite</h2>
@@ -139,65 +139,87 @@ const MinesGame: React.FC<MinesGameProps> = ({ balance, onUpdateBalance, onSaveB
                <span className="text-amber-500 text-[7px] font-black uppercase tracking-widest">Master Control Active</span>
             </div>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="bg-[#1a0d0e]/60 px-4 py-1.5 rounded-full border border-white/10 text-white font-black text-[11px] shadow-inner backdrop-blur-md">
-              ${balance.toLocaleString(undefined, {minimumFractionDigits: 2})}
-          </div>
+        <div className="bg-white/10 px-4 py-1.5 rounded-full border border-white/10 text-white font-black text-[11px] shadow-inner">
+            ${balance.toLocaleString(undefined, {minimumFractionDigits: 2})}
         </div>
       </header>
 
-      <div className="flex-1 flex flex-col items-center justify-center p-4 z-10">
-        <div className="grid grid-cols-5 gap-3 w-full max-w-[360px] aspect-square p-6 bg-black/40 rounded-[3.5rem] border border-white/10 shadow-[0_0_80px_rgba(0,0,0,0.6)] relative backdrop-blur-md">
-          {grid.map((tile, i) => (
-            <button 
-              key={tile.id} 
-              onClick={() => handleTileClick(i)}
-              className={`aspect-square rounded-2xl flex items-center justify-center border-2 transition-all duration-300 relative ${
-                tile.type === 'hidden' ? 'bg-gradient-to-br from-[#24191a] to-[#150d0e] border-white/10 active:scale-90 shadow-lg' :
-                tile.type === 'diamond' ? 'bg-emerald-500/30 border-emerald-500 shadow-[0_0_25px_rgba(16,185,129,0.3)]' :
-                tile.type === 'mine' ? 'bg-red-500/40 border-red-500 animate-in shake duration-500 shadow-[0_0_25px_rgba(234,42,51,0.4)]' : 'opacity-20'
-              }`}
-            >
-              {tile.type === 'diamond' && <span className="material-symbols-outlined text-emerald-400 text-4xl filled drop-shadow-[0_0_10px_rgba(16,185,129,0.5)]">diamond</span>}
-              {tile.type === 'mine' && <span className="material-symbols-outlined text-red-500 text-4xl filled drop-shadow-[0_0_10px_rgba(234,42,51,0.5)]">explosion</span>}
-            </button>
-          ))}
+      {/* Main Playable Area */}
+      <main className="relative z-10 flex-1 flex flex-col items-center py-6 px-4">
+        {/* Game Grid with responsive size */}
+        <div className="w-full max-w-[340px] aspect-square p-4 bg-black/40 rounded-[2.5rem] border border-white/10 shadow-2xl backdrop-blur-md relative">
+          <div className="grid grid-cols-5 gap-2 h-full">
+            {grid.map((tile, i) => (
+              <button 
+                key={tile.id} 
+                onClick={() => handleTileClick(i)}
+                className={`w-full h-full rounded-xl flex items-center justify-center border transition-all duration-300 relative ${
+                  tile.type === 'hidden' ? 'bg-gradient-to-br from-[#24191a] to-[#150d0e] border-white/10 active:scale-90 shadow-md' :
+                  tile.type === 'diamond' ? 'bg-emerald-500/30 border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.3)]' :
+                  tile.type === 'mine' ? 'bg-red-500/40 border-red-500 animate-in shake duration-500 shadow-[0_0_15px_rgba(234,42,51,0.4)]' : 'opacity-20'
+                }`}
+              >
+                {tile.type === 'diamond' && <span className="material-symbols-outlined text-emerald-400 text-3xl filled drop-shadow-[0_0_10px_rgba(16,185,129,0.5)]">diamond</span>}
+                {tile.type === 'mine' && <span className="material-symbols-outlined text-red-500 text-3xl filled drop-shadow-[0_0_10px_rgba(234,42,51,0.5)]">explosion</span>}
+              </button>
+            ))}
+          </div>
         </div>
         
-        <div className="h-16 mt-8 flex flex-col items-center justify-center">
+        {/* Real-time multiplier status */}
+        <div className="h-16 mt-4 flex flex-col items-center justify-center">
           {gameState === 'playing' && revealedCount > 0 && (
             <div className="animate-in zoom-in text-center">
-               <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] mb-1.5">Potential Win</p>
-               <p className="text-emerald-500 font-black text-4xl italic tracking-tighter tabular-nums drop-shadow-[0_0_15px_rgba(16,185,129,0.3)]">${(bet * calculateMultiplier(revealedCount)).toFixed(2)}</p>
+               <p className="text-slate-500 text-[9px] font-black uppercase tracking-[0.2em] mb-1">Current Win</p>
+               <p className="text-emerald-500 font-black text-3xl italic tracking-tighter tabular-nums drop-shadow-[0_0_15px_rgba(16,185,129,0.3)]">${(bet * calculateMultiplier(revealedCount)).toFixed(2)}</p>
             </div>
           )}
+          {gameState === 'ended' && <p className="text-red-500 font-black uppercase tracking-widest text-sm animate-bounce">Game Over!</p>}
+          {gameState === 'cashed-out' && <p className="text-emerald-500 font-black uppercase tracking-widest text-sm animate-bounce">Big Win!</p>}
         </div>
-      </div>
 
-      <div className="p-8 bg-[#1a0d0e]/95 backdrop-blur-2xl rounded-t-[4rem] border-t border-white/10 space-y-6 pb-14 shadow-[0_-30px_60px_rgba(0,0,0,0.8)] z-20">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="flex flex-col gap-2">
-            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">Stake</span>
-            <div className="h-16 bg-white/5 border border-white/10 rounded-2xl flex items-center px-4 shadow-inner">
-               <span className="text-slate-600 font-black text-xl">$</span>
-               <input type="number" value={bet} onChange={(e) => setBet(Number(e.target.value))} disabled={gameState === 'playing'} className="bg-transparent border-none focus:ring-0 text-white px-2 font-black text-xl w-full" />
+        {/* Control Panel: Now part of the scroll flow */}
+        <div className="w-full max-w-[400px] mt-2 mb-10 bg-[#1a0d0e] rounded-[3rem] border border-white/10 p-6 space-y-5 shadow-2xl shadow-black/60">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest pl-1">Stake Amount</span>
+              <div className="h-14 bg-white/5 border border-white/10 rounded-2xl flex items-center px-4 shadow-inner focus-within:border-primary/50 transition-colors">
+                 <span className="text-slate-600 font-black text-lg">$</span>
+                 <input type="number" value={bet} onChange={(e) => setBet(Number(e.target.value))} disabled={gameState === 'playing'} className="bg-transparent border-none focus:ring-0 text-white px-2 font-black text-lg w-full" />
+              </div>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest pl-1">Mines Risk</span>
+              <div className="relative">
+                <select value={minesCount} onChange={(e) => setMinesCount(Number(e.target.value))} disabled={gameState === 'playing'} className="w-full bg-white/5 border border-white/10 rounded-2xl h-14 text-white px-4 font-black text-xs focus:outline-none appearance-none shadow-inner">
+                  {[1, 3, 5, 10, 15, 20].map(m => <option key={m} value={m} className="bg-[#1a0d0e]">{m} Mines</option>)}
+                </select>
+                <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none">expand_more</span>
+              </div>
             </div>
           </div>
-          <div className="flex flex-col gap-2">
-            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">Risk</span>
-            <select value={minesCount} onChange={(e) => setMinesCount(Number(e.target.value))} disabled={gameState === 'playing'} className="bg-white/5 border border-white/10 rounded-2xl h-16 text-white px-5 font-black text-sm focus:outline-none appearance-none shadow-inner">
-              {[1, 3, 5, 10, 15, 20].map(m => <option key={m} value={m} className="bg-[#1a0d0e]">{m} Mines</option>)}
-            </select>
-          </div>
+          
+          {gameState === 'playing' ? (
+            <button 
+              onClick={cashOut} 
+              disabled={revealedCount === 0} 
+              className="w-full h-20 bg-emerald-500 text-white rounded-[2rem] font-black uppercase tracking-[0.2em] shadow-xl shadow-emerald-900/20 active:scale-95 transition-all text-base flex flex-col items-center justify-center gap-0.5 disabled:opacity-30"
+            >
+              <span className="text-[9px] font-black opacity-80">CASH OUT</span>
+              <span className="text-xl tabular-nums tracking-tighter">${(bet * calculateMultiplier(revealedCount)).toFixed(2)}</span>
+            </button>
+          ) : (
+            <button 
+              onClick={startGame} 
+              disabled={balance < bet}
+              className="w-full h-20 bg-primary text-white rounded-[2rem] font-black uppercase tracking-[0.3em] text-lg shadow-xl shadow-primary/20 active:scale-95 transition-all disabled:opacity-30 border-b-4 border-red-800 flex items-center justify-center gap-3"
+            >
+              <span className="material-symbols-outlined">play_arrow</span>
+              START ROUND
+            </button>
+          )}
         </div>
-        {gameState === 'playing' ? (
-          <button onClick={cashOut} disabled={revealedCount === 0} className="w-full h-18 bg-emerald-500 text-white rounded-[2rem] font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all text-sm">
-            CASH OUT (${(bet * calculateMultiplier(revealedCount)).toFixed(2)})
-          </button>
-        ) : (
-          <button onClick={startGame} className="w-full h-18 bg-primary text-white rounded-[2rem] font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all text-sm">START ROUND</button>
-        )}
-      </div>
+      </main>
     </div>
   );
 };

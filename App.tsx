@@ -38,6 +38,7 @@ import TermsConditions from './components/TermsConditions';
 import PrivacyPolicy from './components/PrivacyPolicy';
 import EditProfilePicture from './components/EditProfilePicture';
 import GameDetail from './components/GameDetail';
+import InstallAppModal from './components/InstallAppModal';
 
 export type ViewType = 'login' | 'register' | 'forgot-password' | 'reset-password' | 'dashboard' | 'sports' | 'casino' | 'game-detail' | 'promotions' | 'wallet' | 'deposit' | 'withdraw' | 'profile' | 'edit-profile' | 'personal-details' | 'verification-center' | 'change-password' | 'my-bets' | 'vip-rewards' | 'notifications' | 'help-support' | 'mini-games' | 'crash-game' | 'aviator-game' | 'crazy777-game' | 'mines-game' | 'penalty-game' | 'limbo-game' | 'dice-game' | 'plinko-game' | 'admin' | 'about-us' | 'terms' | 'privacy';
 
@@ -49,8 +50,10 @@ const App: React.FC = () => {
   const [balance, setBalance] = useState(0); 
   const [isDemo, setIsDemo] = useState(false);
   const [showSpin, setShowSpin] = useState(false);
+  const [showInstallModal, setShowInstallModal] = useState(false);
   const [activeToast, setActiveToast] = useState<{title: string, desc: string} | null>(null);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isIOS, setIsIOS] = useState(false);
 
   const [gameStatus, setGameStatus] = useState<Record<string, boolean>>({
     'crash-game': true, 'aviator-game': true, 'crazy777-game': true, 'mines-game': true,
@@ -65,7 +68,9 @@ const App: React.FC = () => {
     const savedLang = localStorage.getItem('appLang') as Language;
     if (savedLang) setLang(savedLang);
 
-    // Listen for PWA installation prompt
+    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    setIsIOS(ios);
+
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
@@ -80,24 +85,19 @@ const App: React.FC = () => {
     });
 
     const fetchSettings = async () => {
-      const { data } = await getGlobalSettings();
-      if (data) {
-        setRiggingSettings(data.rigging || riggingSettings);
-        setGameStatus(data.game_status || gameStatus);
+      try {
+        const { data } = await getGlobalSettings();
+        if (data) {
+          setRiggingSettings(data.rigging || riggingSettings);
+          setGameStatus(data.game_status || gameStatus);
+        }
+      } catch (e) {
+        console.error("Settings fetch failed", e);
       }
     };
     fetchSettings();
 
-    const settingsChannel = supabase.channel('admin_changes')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'settings' }, payload => {
-        if (payload.new) {
-          setRiggingSettings(payload.new.rigging);
-          setGameStatus(payload.new.game_status);
-        }
-      })
-      .subscribe();
-
-    const authListener = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN') {
         setUser(session?.user ?? null);
         if (session?.user) fetchUserData(session.user.id);
@@ -115,10 +115,47 @@ const App: React.FC = () => {
     });
 
     return () => {
-      settingsChannel.unsubscribe();
-      authListener.data.subscription.unsubscribe();
+      authListener.subscription.unsubscribe();
     };
   }, []);
+
+  // --- REFINED REALTIME SUBSCRIPTION ---
+  useEffect(() => {
+    if (!user?.id || isDemo) return;
+
+    const channel = supabase
+      .channel(`profile_realtime_${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${user.id}`,
+        },
+        (payload) => {
+          const updatedProfile = payload.new;
+          if (updatedProfile) {
+            setProfile(updatedProfile);
+            setBalance(Number(updatedProfile.balance) || 0);
+            
+            if (updatedProfile.status === 'blocked') {
+              supabase.auth.signOut();
+              setActiveToast({ title: "Account Blocked", desc: "Your account has been suspended." });
+            }
+          }
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log("Realtime subscribed for balance sync");
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, isDemo]);
 
   const fetchUserData = async (userId: string) => {
     const { data: profileData } = await getUserProfile(userId);
@@ -133,25 +170,25 @@ const App: React.FC = () => {
     }
   };
 
-  const handleInstallApp = async () => {
+  const handleInstallClick = () => {
+    setShowInstallModal(true);
+  };
+
+  const handleNativeInstall = async () => {
     if (deferredPrompt) {
       deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
       if (outcome === 'accepted') {
         setDeferredPrompt(null);
+        setShowInstallModal(false);
       }
-    } else {
-      const msg = lang === 'en' 
-        ? "To install: Tap the Browser Menu (3 dots) and select 'Install App' or 'Add to Home Screen'."
-        : "অ্যাপটি ইন্সটল করতে: আপনার ব্রাউজারের ৩-ডট মেনুতে ক্লিক করে 'Install App' অথবা 'Add to Home Screen' সিলেক্ট করুন।";
-      setActiveToast({ title: "App Installation", desc: msg });
-      setTimeout(() => setActiveToast(null), 6000);
     }
   };
 
   const updateBalance = async (newBalance: number) => {
-    setBalance(newBalance);
+    setBalance(newBalance); // Instant UI feedback
     if (user && !isDemo) {
+      // Database update triggers the Realtime listener above
       await supabase.from('profiles').update({ balance: newBalance }).eq('id', user.id);
     }
   };
@@ -175,7 +212,6 @@ const App: React.FC = () => {
   };
 
   const isAuthView = ['login', 'register', 'forgot-password', 'reset-password'].includes(currentView);
-  
   const isFullScreen = [
     'crash-game', 'aviator-game', 'crazy777-game', 'mines-game', 'penalty-game', 'limbo-game', 'dice-game', 'plinko-game',
     'personal-details', 'verification-center', 'change-password', 'edit-profile', 'game-detail',
@@ -184,7 +220,7 @@ const App: React.FC = () => {
   ].includes(currentView);
 
   return (
-    <div className="h-[100dvh] w-full flex flex-col items-center justify-center bg-[#0d0909] overflow-hidden font-display select-none animate-gpu">
+    <div className="h-[100dvh] w-full flex flex-col items-center justify-center bg-[#0d0909] overflow-hidden font-display select-none animate-gpu text-white">
       <div className={`w-full ${isAuthView ? 'max-w-md' : 'max-w-6xl'} bg-[#1a0d0e] h-full relative flex flex-col overflow-hidden shadow-[0_0_100px_rgba(0,0,0,1)]`}>
         
         {activeToast && (
@@ -216,7 +252,7 @@ const App: React.FC = () => {
           {currentView === 'withdraw' && <Withdraw lang={lang} balance={balance} onBack={() => navigate('wallet')} onWithdrawSuccess={(amt) => { updateBalance(balance - amt); navigate('wallet'); }} />}
           {currentView === 'notifications' && <Notifications lang={lang} onBack={() => navigate('dashboard')} />}
           {currentView === 'my-bets' && <MyBets lang={lang} user={user} onBack={() => navigate('dashboard')} onNavigateHome={() => navigate('dashboard')} />}
-          {currentView === 'profile' && <ProfileSettings lang={lang} userProfile={profile} onBack={() => navigate('dashboard')} onLogout={async () => { await supabase.auth.signOut(); navigate('login'); }} onLanguageToggle={() => { setLang(lang === 'en' ? 'bn' : 'en'); }} onEditProfile={() => navigate('edit-profile')} onPersonalDetails={() => navigate('personal-details')} onVerificationCenter={() => navigate('verification-center')} onChangePassword={() => navigate('change-password')} onVipRewards={() => navigate('vip-rewards')} onHelpSupport={() => navigate('help-support')} onAboutUs={() => navigate('about-us')} onTerms={() => navigate('terms')} onPrivacy={() => navigate('privacy')} onAdminPanel={profile?.role === 'admin' ? () => navigate('admin') : undefined} onDownloadApp={handleInstallApp} />}
+          {currentView === 'profile' && <ProfileSettings lang={lang} userProfile={profile} onBack={() => navigate('dashboard')} onLogout={async () => { await supabase.auth.signOut(); navigate('login'); }} onLanguageToggle={() => { setLang(lang === 'en' ? 'bn' : 'en'); }} onEditProfile={() => navigate('edit-profile')} onPersonalDetails={() => navigate('personal-details')} onVerificationCenter={() => navigate('verification-center')} onChangePassword={() => navigate('change-password')} onVipRewards={() => navigate('vip-rewards')} onHelpSupport={() => navigate('help-support')} onAboutUs={() => navigate('about-us')} onTerms={() => navigate('terms')} onPrivacy={() => navigate('privacy')} onAdminPanel={profile?.role === 'admin' ? () => navigate('admin') : undefined} onDownloadApp={handleInstallClick} />}
           {currentView === 'personal-details' && <PersonalDetails onBack={() => navigate('profile')} user={user} />}
           {currentView === 'verification-center' && <VerificationCenter onBack={() => navigate('profile')} />}
           {currentView === 'change-password' && <ChangePassword onBack={() => navigate('profile')} />}
@@ -240,6 +276,8 @@ const App: React.FC = () => {
         </div>
 
         {showSpin && <DailySpin onWin={(amt) => updateBalance(balance + amt)} onClose={() => setShowSpin(false)} />}
+        
+        {showInstallModal && <InstallAppModal lang={lang} onClose={() => setShowInstallModal(false)} onInstall={handleNativeInstall} isIOS={isIOS} />}
 
         {!isAuthView && !isFullScreen && <BottomNav lang={lang} currentView={currentView} onNavigate={navigate} />}
       </div>

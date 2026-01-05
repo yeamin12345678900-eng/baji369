@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 
 interface PenaltyGameProps {
   balance: number;
@@ -58,197 +58,219 @@ const PenaltyGame: React.FC<PenaltyGameProps> = ({ balance, onUpdateBalance, onS
     playSound('start');
   };
 
+  // Map position index to CSS positioning percentages for animations
+  const getPosCoords = (pos: number) => {
+    const coords: Record<number, { x: string, y: string }> = {
+      1: { x: '20%', y: '25%' }, // Top Left
+      2: { x: '50%', y: '25%' }, // Top Center
+      3: { x: '80%', y: '25%' }, // Top Right
+      4: { x: '20%', y: '55%' }, // Bottom Left
+      6: { x: '80%', y: '55%' }, // Bottom Right
+    };
+    return coords[pos] || { x: '50%', y: '50%' };
+  };
+
   const shoot = (position: number) => {
     if (gameState !== 'playing') return;
     setGameState('animating');
     setBallPos(position);
     playSound('kick');
 
-    setTimeout(() => {
-      const directSaveProb = riggingIntensity > 0.8 ? 0.8 : (riggingIntensity * 0.5);
-      let isGoal = false;
-      if (Math.random() < directSaveProb) {
-        isGoal = false; 
-      } else {
-        const winChance = 0.45 - (riggingIntensity * 0.3) - (round * 0.08);
-        isGoal = Math.random() < winChance;
-      }
+    // Logic: Will keeper save it?
+    const winThreshold = 0.4 + (riggingIntensity * 0.4); 
+    const isGoal = Math.random() > winThreshold;
+    
+    // Determine where keeper dives
+    // If not goal, keeper must dive to the SAME position as ball
+    // If goal, keeper dives to a DIFFERENT random position
+    let kPos = position;
+    if (isGoal) {
+      const otherPositions = [1, 2, 3, 4, 6].filter(p => p !== position);
+      kPos = otherPositions[Math.floor(Math.random() * otherPositions.length)];
+    }
+    setKeeperPos(kPos);
 
+    setTimeout(() => {
       if (isGoal) {
-        const wrongPos = [1, 2, 3, 4, 6].filter(p => p !== position);
-        setKeeperPos(wrongPos[Math.floor(Math.random() * wrongPos.length)]);
+        setGameState('goal');
+        playSound('goal');
+        const nextMult = MULTIPLIERS[round];
+        setMultiplier(nextMult);
+        setRound(prev => prev + 1);
         
-        setTimeout(() => {
-          setGameState('goal');
-          playSound('goal');
-          const nextMult = MULTIPLIERS[round];
-          setMultiplier(nextMult);
-          setRound(prev => prev + 1);
-          if (round === 4) handleCollect();
-          else setTimeout(() => { setGameState('playing'); setKeeperPos(null); setBallPos(null); }, 1000);
-        }, 300);
+        if (round === 4) {
+            setTimeout(handleCollect, 1500);
+        } else {
+            setTimeout(() => {
+                setGameState('playing');
+                setBallPos(null);
+                setKeeperPos(null);
+            }, 1200);
+        }
       } else {
-        setKeeperPos(position); 
-        setTimeout(() => {
-          setGameState('saved');
-          playSound('save');
-          if (onSaveBet) onSaveBet({ game_name: 'Penalty', stake: bet, multiplier: 0, payout: 0, status: 'lost' });
-          setTimeout(() => { setGameState('idle'); setRound(0); setMultiplier(1.0); setKeeperPos(null); setBallPos(null); }, 1500);
-        }, 300);
+        setGameState('saved');
+        playSound('save');
+        if (onSaveBet) onSaveBet({ game_name: 'Penalty', stake: bet, multiplier: 0, payout: 0, status: 'lost' });
+        setTimeout(() => { 
+            setGameState('idle'); 
+            setRound(0); 
+            setMultiplier(1.0); 
+            setBallPos(null);
+            setKeeperPos(null);
+        }, 2000);
       }
     }, 600);
   };
 
   const handleCollect = () => {
-    if (multiplier <= 1.0 || (gameState !== 'playing' && gameState !== 'goal')) return;
-    const win = bet * multiplier;
-    if (onSaveBet) onSaveBet({ game_name: 'Penalty', stake: bet, multiplier: multiplier, payout: win, status: 'won' });
-    onUpdateBalance(balance + win);
+    if (multiplier <= 1.0) return;
+    const winAmount = bet * multiplier;
+    onUpdateBalance(balance + winAmount);
+    if (onSaveBet) onSaveBet({ game_name: 'Penalty', stake: bet, multiplier, payout: winAmount, status: 'won' });
     setGameState('idle');
     setRound(0);
     setMultiplier(1.0);
+    setBallPos(null);
+    setKeeperPos(null);
     playSound('win');
   };
 
+  const ballCoords = ballPos ? getPosCoords(ballPos) : { x: '50%', y: '90%' };
+  const keeperCoords = keeperPos ? getPosCoords(keeperPos) : { x: '50%', y: '60%' };
+
   return (
-    <div className="flex flex-col h-[100dvh] bg-[#0d0909] font-display overflow-hidden select-none relative">
-      
-      {/* Stadium Background */}
-      <div className="absolute inset-0 z-0">
-        <div 
-          className="absolute inset-0 bg-cover bg-center"
-          style={{ backgroundImage: `url("${BACKGROUND_URL}")` }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-[#0a150d]"></div>
-        <div className="absolute inset-0 bg-emerald-900/10 backdrop-blur-[1px]"></div>
+    <div className="flex flex-col min-h-screen bg-[#0d0909] font-display overflow-y-auto no-scrollbar select-none relative pb-10">
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url("${BACKGROUND_URL}")` }} />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/95 via-transparent to-[#0a150d]"></div>
       </div>
 
-      <header className="p-4 flex items-center justify-between border-b border-white/5 bg-black/40 z-20 backdrop-blur-md">
+      <header className="sticky top-0 z-50 p-4 flex items-center justify-between border-b border-white/5 bg-black/60 backdrop-blur-xl">
         <button onClick={onBack} className="text-slate-400 size-10 flex items-center justify-center rounded-full active:bg-white/5"><span className="material-symbols-outlined">arrow_back</span></button>
-        <div className="text-center">
-            <h2 className="text-white font-black uppercase tracking-widest text-[10px]">PENALTY PRO</h2>
-            <div className="flex items-center justify-center gap-1">
-               <span className="size-1 bg-blue-500 rounded-full animate-pulse"></span>
-               <span className="text-blue-400 text-[8px] font-black uppercase">Arena Sync Active</span>
-            </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="bg-white/10 px-4 py-1.5 rounded-full border border-white/10 flex items-center gap-2 shadow-inner backdrop-blur-md">
-              <span className="text-white font-black text-xs tabular-nums">${balance.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
-          </div>
+        <h2 className="text-blue-400 font-black uppercase text-[10px] tracking-widest italic">Penalty Elite</h2>
+        <div className="bg-white/10 px-4 py-1.5 rounded-full border border-white/20 flex items-center gap-2 shadow-inner backdrop-blur-md">
+            <span className="text-white font-black text-xs tabular-nums">${balance.toLocaleString()}</span>
         </div>
       </header>
 
-      <div className="flex-1 relative flex flex-col items-center justify-center p-6 z-10">
-        <div className="w-full max-w-sm aspect-[16/10] border-[8px] border-white/20 rounded-t-3xl relative overflow-hidden bg-emerald-950/40 shadow-[0_0_100px_rgba(0,0,0,0.6)] backdrop-blur-sm">
-           <div className="absolute inset-0 opacity-[0.1]" style={{backgroundImage: 'repeating-linear-gradient(45deg, #fff 0, #fff 1px, transparent 0, transparent 20px), repeating-linear-gradient(-45deg, #fff 0, #fff 1px, transparent 0, transparent 20px)'}} />
+      <main className="relative z-10 flex-1 flex flex-col items-center pt-6 px-4">
+        {/* Stadium Display */}
+        <div className="w-full max-w-sm aspect-[16/11] border-[6px] border-white/10 rounded-t-[3rem] relative overflow-hidden bg-emerald-950/40 shadow-2xl backdrop-blur-sm border-b-0">
+           {/* Goal Net Pattern */}
+           <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', backgroundSize: '15px 15px' }}></div>
            
-           {/* Keeper */}
-           <div className={`absolute bottom-4 left-1/2 -translate-x-1/2 transition-all duration-500 ease-out z-20 ${
-             keeperPos === 1 ? '-translate-x-[180%] -translate-y-[100%] rotate-[-45deg]' :
-             keeperPos === 2 ? '-translate-x-1/2 -translate-y-[120%]' :
-             keeperPos === 3 ? 'translate-x-[80%] -translate-y-[100%] rotate-[45deg]' :
-             keeperPos === 4 ? '-translate-x-[160%] rotate-[-20deg]' :
-             keeperPos === 6 ? 'translate-x-[60%] rotate-[20deg]' : ''
-           }`}>
-             <div className="flex flex-col items-center group">
-                <div className="size-20 bg-amber-500 rounded-full border-4 border-black/30 flex items-center justify-center shadow-2xl">
-                   <span className="material-symbols-outlined text-black font-black text-5xl">sports_handball</span>
-                </div>
-                <div className="w-14 h-24 bg-blue-700 rounded-t-2xl -mt-2 border-x-4 border-black/20"></div>
-             </div>
-           </div>
-
-           {/* Ball */}
-           {ballPos && (
-             <div className={`absolute bottom-6 left-1/2 -translate-x-1/2 transition-all duration-500 ease-in-out z-10 ${
-               gameState === 'idle' ? '' :
-               ballPos === 1 ? '-translate-x-[280%] -translate-y-[280%] scale-[0.4]' :
-               ballPos === 2 ? '-translate-x-1/2 -translate-y-[320%] scale-[0.4]' :
-               ballPos === 3 ? 'translate-x-[180%] -translate-y-[280%] scale-[0.4]' :
-               ballPos === 4 ? '-translate-x-[280%] -translate-y-[120%] scale-[0.4]' :
-               ballPos === 6 ? 'translate-x-[180%] -translate-y-[120%] scale-[0.4]' : ''
-             }`}>
-                <div className="size-12 bg-white rounded-full shadow-2xl flex items-center justify-center overflow-hidden border-2 border-black/30 animate-spin">
-                   <div className="w-full h-full opacity-40" style={{backgroundImage: 'conic-gradient(#000 0 90deg, #fff 0 180deg, #000 0 270deg, #fff 0)'}} />
-                </div>
-             </div>
-           )}
-
-           {/* Targets */}
+           {/* Shooting Targets */}
            {gameState === 'playing' && (
-             <div className="absolute inset-0 grid grid-cols-3 grid-rows-2 gap-8 p-12 z-30">
+             <div className="absolute inset-0 z-20 grid grid-cols-3 grid-rows-2 gap-4 p-8">
                 {[1,2,3,4,5,6].map(i => i !== 5 && (
                   <button 
-                    key={i} onClick={() => shoot(i)}
-                    className="size-full rounded-[2rem] border-4 border-dashed border-white/20 hover:border-primary hover:bg-primary/20 transition-all flex items-center justify-center group active:scale-90"
+                    key={i} 
+                    onClick={() => shoot(i)} 
+                    className="size-full rounded-full border-2 border-dashed border-white/20 hover:border-primary hover:bg-primary/20 transition-all active:scale-90 flex items-center justify-center group"
                   >
-                    <div className="size-8 bg-white/10 rounded-full group-hover:bg-primary group-hover:scale-125 transition-all shadow-inner" />
+                    <span className="material-symbols-outlined text-white/10 group-hover:text-white/40 text-xl">target</span>
                   </button>
                 ))}
              </div>
            )}
 
+           {/* Goalkeeper Character */}
+           <div 
+             className="absolute transition-all duration-500 ease-out z-30 pointer-events-none flex flex-col items-center"
+             style={{ 
+               left: keeperCoords.x, 
+               top: keeperCoords.y, 
+               transform: `translate(-50%, -50%) ${keeperPos ? 'scale(1.2) rotate(' + (keeperPos < 3 ? '-15deg' : '15deg') + ')' : 'scale(1)'}` 
+             }}
+           >
+              <div className="relative">
+                 <span className={`material-symbols-outlined text-white text-7xl drop-shadow-[0_0_20px_rgba(255,255,255,0.4)] ${gameState === 'saved' ? 'text-amber-400' : ''}`}>
+                    sports_handball
+                 </span>
+                 {gameState === 'saved' && <span className="absolute -top-4 -right-4 bg-red-500 text-white text-[8px] font-black px-2 py-1 rounded-full animate-bounce">SAVED!</span>}
+              </div>
+           </div>
+
+           {/* The Ball */}
+           <div 
+             className={`absolute transition-all duration-500 ease-out z-40 pointer-events-none ${gameState === 'goal' ? 'animate-shake' : ''}`}
+             style={{ 
+               left: ballCoords.x, 
+               top: ballCoords.y, 
+               transform: `translate(-50%, -50%) ${ballPos ? 'scale(0.6) rotate(360deg)' : 'scale(1)'}` 
+             }}
+           >
+              <span className="material-symbols-outlined text-white text-4xl filled drop-shadow-lg">
+                 sports_soccer
+              </span>
+           </div>
+
+           {/* Status Overlays */}
            {gameState === 'goal' && (
-             <div className="absolute inset-0 flex items-center justify-center bg-emerald-500/20 backdrop-blur-[6px] animate-in zoom-in duration-300 z-40">
-                <div className="text-center">
-                  <h1 className="text-8xl font-black text-white italic tracking-tighter drop-shadow-[0_0_30px_rgba(16,185,129,0.8)] animate-bounce">GOAL!</h1>
-                  <p className="text-emerald-300 font-black uppercase tracking-[0.3em] text-sm mt-6 bg-emerald-950/80 px-6 py-2 rounded-full border border-emerald-500/30">Next: {MULTIPLIERS[round]?.toFixed(2)}x</p>
-                </div>
-             </div>
-           )}
-           {gameState === 'saved' && (
-             <div className="absolute inset-0 flex items-center justify-center bg-red-600/30 backdrop-blur-[6px] animate-in shake duration-500 z-40">
-                <div className="text-center">
-                   <h1 className="text-7xl font-black text-white italic tracking-tighter drop-shadow-[0_0_30px_rgba(234,42,51,0.8)] uppercase">SAVED</h1>
-                   <p className="text-red-300 text-[12px] font-black uppercase mt-4 tracking-[0.4em] bg-red-950/80 px-6 py-2 rounded-full border border-red-500/30">KEEPER READ YOU</p>
-                </div>
+             <div className="absolute inset-0 flex items-center justify-center z-50 pointer-events-none">
+                <h1 className="text-7xl font-black text-white italic animate-in zoom-in duration-300 drop-shadow-[0_0_30px_rgba(234,42,51,0.8)] uppercase">Goal!</h1>
              </div>
            )}
         </div>
 
-        <div className="mt-16 w-full max-w-sm flex gap-3">
+        {/* Multiplier Progress */}
+        <div className="mt-6 w-full max-w-sm flex gap-1.5">
            {MULTIPLIERS.map((m, i) => (
-             <div key={i} className="flex-1 flex flex-col gap-3">
-                <div className={`h-2.5 rounded-full transition-all duration-700 ${round > i ? 'bg-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.8)]' : 'bg-white/5'}`} />
-                <span className={`text-[10px] font-black text-center tracking-tighter ${round === i ? 'text-white' : 'text-slate-700'}`}>{m}x</span>
+             <div key={i} className="flex-1 flex flex-col gap-1.5">
+                <div className={`h-1.5 rounded-full transition-all duration-500 ${round > i ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-white/5'}`} />
+                <span className={`text-[7px] font-black text-center ${round === i ? 'text-white' : 'text-slate-600'}`}>{m}x</span>
              </div>
            ))}
         </div>
-      </div>
 
-      <div className="p-8 bg-[#1a0d0e]/95 backdrop-blur-2xl rounded-t-[4rem] border-t border-white/10 space-y-6 pb-14 shadow-[0_-30px_60px_rgba(0,0,0,0.8)] z-50">
-        <div className="flex items-center justify-between">
-           <div className="flex flex-col">
-              <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] leading-none mb-2">Multiplier</span>
-              <span className={`text-5xl font-black transition-colors ${multiplier > 1 ? 'text-emerald-400' : 'text-white'}`}>
-                {multiplier.toFixed(2)}<span className="text-2xl ml-1">x</span>
-              </span>
-           </div>
-           {multiplier > 1.0 && (gameState === 'playing' || gameState === 'goal') && (
-             <button onClick={handleCollect} className="bg-emerald-500 text-white h-20 px-10 rounded-3xl font-black uppercase tracking-[0.2em] shadow-2xl active:scale-95 transition-all flex flex-col items-center justify-center">
-               <span className="mb-0.5">COLLECT</span>
-               <span className="text-[11px] opacity-80 tabular-nums">${(bet * multiplier).toFixed(2)}</span>
-             </button>
-           )}
+        {/* Control UI */}
+        <div className="w-full max-w-[400px] mt-8 mb-10 bg-[#1a0d0e] rounded-[3rem] border border-white/10 p-6 space-y-5 shadow-2xl shadow-black/60 relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-4 opacity-5 rotate-12">
+             <span className="material-symbols-outlined text-9xl">sports_soccer</span>
+          </div>
+          
+          <div className="flex items-center justify-between px-2 relative z-10">
+              <div className="flex flex-col">
+                 <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Potential Payout</span>
+                 <span className="text-3xl font-black text-white italic tracking-tighter tabular-nums">${(bet * multiplier).toFixed(2)}</span>
+              </div>
+              {multiplier > 1 && gameState === 'playing' && (
+                <button onClick={handleCollect} className="bg-emerald-500 text-white h-14 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-emerald-900/20 active:scale-95 transition-all animate-in slide-in-from-right">COLLECT</button>
+              )}
+          </div>
+          
+          {gameState === 'idle' ? (
+            <div className="space-y-4 relative z-10">
+               <div className="h-16 bg-white/5 border border-white/10 rounded-2xl flex items-center px-6 shadow-inner focus-within:border-primary/50 transition-colors">
+                  <span className="text-slate-600 font-black text-xl mr-3">$</span>
+                  <input type="number" value={bet} onChange={(e) => setBet(Number(e.target.value))} className="bg-transparent border-none focus:ring-0 text-white font-black text-2xl w-full p-0 tabular-nums" />
+               </div>
+               <button onClick={startGame} className="w-full h-20 bg-primary text-white rounded-[2rem] font-black uppercase tracking-[0.3em] text-lg shadow-xl shadow-primary/30 active:scale-95 transition-all border-b-4 border-red-900 flex items-center justify-center gap-3">
+                  <span className="material-symbols-outlined">play_arrow</span>
+                  START ROUND
+               </button>
+            </div>
+          ) : (
+            <div className="py-4 text-center relative z-10">
+               <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.25em] animate-pulse flex items-center justify-center gap-2">
+                  <span className="material-symbols-outlined text-sm">ads_click</span>
+                  Select target to shoot
+               </p>
+            </div>
+          )}
         </div>
+      </main>
 
-        {gameState === 'idle' ? (
-          <div className="space-y-4">
-             <div className="flex flex-col gap-3">
-                <div className="flex items-center gap-3 h-16 bg-white/5 rounded-2xl border border-white/10 px-6 focus-within:border-blue-500/50 transition-all shadow-inner">
-                   <span className="text-slate-500 font-black text-2xl">$</span>
-                   <input type="number" value={bet} onChange={(e) => setBet(Math.max(0, Number(e.target.value)))} className="bg-transparent border-none focus:ring-0 text-white font-black text-2xl w-full p-0" />
-                </div>
-             </div>
-             <button onClick={startGame} className="w-full h-20 bg-primary text-white rounded-[2rem] font-black uppercase tracking-[0.3em] text-xl shadow-[0_15px_40px_rgba(234,42,51,0.4)] active:scale-[0.98] transition-all">KICK OFF</button>
-          </div>
-        ) : (
-          <div className="text-center py-6">
-             <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.5em] animate-pulse">PICK YOUR TARGET SPOT</p>
-          </div>
-        )}
-      </div>
+      <style>{`
+        @keyframes shake {
+          0%, 100% { transform: translate(-50%, -50%) scale(0.6) rotate(360deg); }
+          25% { transform: translate(-52%, -52%) scale(0.6) rotate(365deg); }
+          75% { transform: translate(-48%, -48%) scale(0.6) rotate(355deg); }
+        }
+        .animate-shake {
+          animation: shake 0.1s ease-in-out infinite;
+        }
+      `}</style>
     </div>
   );
 };

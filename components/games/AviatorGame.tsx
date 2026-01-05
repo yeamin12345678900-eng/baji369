@@ -51,51 +51,32 @@ const AviatorGame: React.FC<AviatorGameProps> = ({ balance, onUpdateBalance, onS
   const startNewGame = () => {
     if (gameState === 'running') return;
     if (balance < bet) return;
-    
     onUpdateBalance(balance - bet);
-    
     const random = Math.random();
     let target = 1.00;
     const instantCrashThreshold = riggingIntensity * 0.70; 
-    
     if (random < instantCrashThreshold) {
       target = 1.00 + (Math.random() * 0.12);
     } else {
       const houseEdge = 0.05 + (riggingIntensity * 0.40); 
       const rawTarget = (1.0 - houseEdge) / (1.0 - Math.random());
       target = parseFloat(Math.max(1.01, rawTarget).toFixed(2));
-      
-      if (bet > 1000 || riggingIntensity > 0.8) {
-        if (target > 1.5) target = 1.05 + (Math.random() * 0.4);
-      }
     }
-
     setMultiplier(1.0);
     multiplierRef.current = 1.0;
     setGameState('running');
     playSound('engine');
-
     timerRef.current = setInterval(() => {
       const growthFactor = 0.005 + (multiplierRef.current * 0.008);
       multiplierRef.current += growthFactor;
       const current = parseFloat(multiplierRef.current.toFixed(2));
-      
       if (current >= target) {
         clearInterval(timerRef.current);
         setGameState('fly-away');
         setMultiplier(target);
         playSound('flyAway');
         setHistory(prev => [target, ...prev.slice(0, 4)]);
-        
-        if (onSaveBet) {
-          onSaveBet({
-            game_name: 'Aviator',
-            stake: bet,
-            multiplier: 0,
-            payout: 0,
-            status: 'lost'
-          });
-        }
+        if (onSaveBet) onSaveBet({ game_name: 'Aviator', stake: bet, multiplier: 0, payout: 0, status: 'lost' });
       } else {
         setMultiplier(current);
       }
@@ -104,22 +85,12 @@ const AviatorGame: React.FC<AviatorGameProps> = ({ balance, onUpdateBalance, onS
 
   const handleCashOut = () => {
     if (gameState !== 'running' || multiplier < 1.02) return;
-
     clearInterval(timerRef.current);
     const winAmount = bet * multiplier;
     onUpdateBalance(currentBalanceRef.current + winAmount);
     setGameState('cashed-out');
     playSound('win');
-    
-    if (onSaveBet) {
-      onSaveBet({
-        game_name: 'Aviator',
-        stake: bet,
-        multiplier: multiplier,
-        payout: winAmount,
-        status: 'won'
-      });
-    }
+    if (onSaveBet) onSaveBet({ game_name: 'Aviator', stake: bet, multiplier: multiplier, payout: winAmount, status: 'won' });
   };
 
   useEffect(() => {
@@ -127,112 +98,65 @@ const AviatorGame: React.FC<AviatorGameProps> = ({ balance, onUpdateBalance, onS
   }, []);
 
   return (
-    <div className="flex flex-col h-full bg-[#120404] font-display overflow-hidden select-none relative">
-      
-      {/* Dynamic Themed Background */}
-      <div className="absolute inset-0 z-0">
-        <div 
-          className="absolute inset-0 bg-cover bg-center transition-transform duration-[20000ms] ease-linear"
-          style={{ 
-            backgroundImage: `url("${BACKGROUND_URL}")`,
-            transform: gameState === 'running' ? 'scale(1.3) rotate(2deg)' : 'scale(1)'
-          }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#120404]/80 via-transparent to-[#120404]"></div>
-        <div className="absolute inset-0 bg-blue-900/10 backdrop-blur-[2px]"></div>
+    <div className="flex flex-col min-h-screen bg-[#120404] font-display overflow-y-auto no-scrollbar select-none relative pb-10">
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url("${BACKGROUND_URL}")` }} />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#120404]/95 via-[#120404]/40 to-[#120404]"></div>
       </div>
 
-      <header className="p-4 flex items-center justify-between border-b border-white/5 bg-black/40 z-20 backdrop-blur-md">
-        <button onClick={onBack} className="text-slate-400 size-10 flex items-center justify-center rounded-full active:bg-white/5">
-          <span className="material-symbols-outlined">arrow_back</span>
-        </button>
-        <div className="flex flex-col items-center">
-            <h2 className="text-white font-black uppercase tracking-[0.2em] text-[10px]">Baji Original</h2>
-            <h1 className="text-primary font-black text-sm uppercase italic">AVIATOR PRO</h1>
-        </div>
-        <div className="flex items-center gap-3">
-          <button onClick={() => setIsMuted(!isMuted)} className="text-slate-500">
-            <span className="material-symbols-outlined text-[20px]">{isMuted ? 'volume_off' : 'volume_up'}</span>
-          </button>
-          <div className="bg-white/5 px-4 py-1.5 rounded-full border border-white/10 flex items-center gap-2 shadow-inner backdrop-blur-md">
-              <span className="text-white font-black text-xs tabular-nums">${balance.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
-          </div>
+      <header className="sticky top-0 z-50 p-4 flex items-center justify-between border-b border-white/5 bg-black/60 backdrop-blur-xl">
+        <button onClick={onBack} className="text-slate-400 size-10 flex items-center justify-center rounded-full active:bg-white/5"><span className="material-symbols-outlined">arrow_back</span></button>
+        <h2 className="text-primary font-black uppercase text-xs tracking-[0.2em] italic">Aviator Pro</h2>
+        <div className="bg-white/10 px-4 py-1.5 rounded-full border border-white/20 flex items-center gap-2 shadow-inner">
+            <span className="text-white font-black text-xs tabular-nums">${balance.toLocaleString()}</span>
         </div>
       </header>
 
-      {/* History Ribbon */}
-      <div className="flex gap-2 p-2 bg-black/50 overflow-x-auto no-scrollbar border-b border-white/5 z-10 backdrop-blur-sm">
+      <div className="flex gap-2 p-2 bg-black/50 overflow-x-auto no-scrollbar border-b border-white/5 z-10 sticky top-[65px] backdrop-blur-md">
         {history.map((h, i) => (
-          <span key={i} className={`text-[9px] font-black px-3 py-1 rounded-full whitespace-nowrap ${h < 2 ? 'text-blue-400 bg-blue-500/10 border border-blue-500/20' : h < 10 ? 'text-purple-400 bg-purple-500/10 border border-purple-500/20' : 'text-primary bg-primary/10 border border-primary/30 shadow-[0_0_10px_rgba(234,42,51,0.2)]'}`}>
+          <span key={i} className={`text-[9px] font-black px-3 py-1 rounded-full whitespace-nowrap ${h < 2 ? 'text-blue-400 bg-blue-500/10 border border-blue-500/20' : 'text-primary bg-primary/10 border border-primary/30'}`}>
             {h.toFixed(2)}x
           </span>
         ))}
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center p-8 relative overflow-hidden z-10">
-        <div className="relative w-full h-64 flex flex-col items-center justify-center">
+      <main className="relative z-10 flex-1 flex flex-col items-center pt-8 px-6">
+        <div className="h-64 flex flex-col items-center justify-center mb-10">
            {gameState === 'fly-away' ? (
-             <div className="animate-out slide-out-to-top-right slide-out-to-right duration-1000 fill-mode-forwards flex flex-col items-center">
+             <div className="animate-in slide-in-from-bottom duration-500 flex flex-col items-center">
                 <span className="material-symbols-outlined text-primary text-8xl drop-shadow-[0_0_50px_rgba(234,42,51,0.6)]">flight_takeoff</span>
-                <p className="text-primary font-black uppercase mt-4 tracking-[0.3em] text-3xl animate-pulse italic drop-shadow-lg">FLEW AWAY!</p>
+                <p className="text-primary font-black uppercase mt-4 tracking-[0.3em] text-3xl italic">FLEW AWAY!</p>
              </div>
            ) : (
-             <div className={`flex flex-col items-center transition-transform duration-500 ${gameState === 'running' ? 'scale-110' : ''}`}>
-                <h1 className={`text-8xl font-black tabular-nums transition-all drop-shadow-[0_0_40px_rgba(255,255,255,0.2)] ${
-                  gameState === 'cashed-out' ? 'text-emerald-500 scale-105' : 'text-white'
-                }`}>
+             <div className="flex flex-col items-center">
+                <h1 className={`text-8xl font-black tabular-nums transition-all drop-shadow-[0_0_40px_rgba(255,255,255,0.2)] ${gameState === 'cashed-out' ? 'text-emerald-500' : 'text-white'}`}>
                   {multiplier.toFixed(2)}<span className="text-3xl ml-1 text-primary italic">x</span>
                 </h1>
-                
-                <div className={`mt-8 relative ${gameState === 'running' ? 'animate-bounce' : ''}`}>
-                  <span className={`material-symbols-outlined text-8xl transition-colors ${gameState === 'cashed-out' ? 'text-emerald-500' : 'text-primary'}`}>
-                    {gameState === 'running' ? 'flight' : 'flight_takeoff'}
-                  </span>
-                  {gameState === 'running' && (
-                    <div className="absolute -left-16 top-1/2 -translate-y-1/2 flex gap-2">
-                      <div className="w-8 h-1 bg-white/20 rounded-full animate-ping"></div>
-                    </div>
-                  )}
-                </div>
+                <span className={`material-symbols-outlined text-7xl mt-6 transition-colors ${gameState === 'cashed-out' ? 'text-emerald-500' : 'text-primary'} ${gameState === 'running' ? 'animate-bounce' : ''}`}>
+                  {gameState === 'running' ? 'flight' : 'flight_takeoff'}
+                </span>
              </div>
            )}
         </div>
-      </div>
 
-      <div className="p-8 bg-[#1a0606]/95 backdrop-blur-2xl rounded-t-[4rem] border-t border-white/10 space-y-6 pb-14 z-20 shadow-[0_-30px_60px_rgba(0,0,0,0.8)]">
-        <div className="flex items-center gap-3 h-16 bg-white/5 rounded-2xl border border-white/10 px-6 group focus-within:border-primary/50 transition-all shadow-inner">
-           <span className="text-slate-600 font-black text-xl">$</span>
-           <input 
-              type="number" 
-              value={bet}
-              onChange={(e) => setBet(Math.max(0, Number(e.target.value)))}
-              disabled={gameState === 'running'}
-              className="bg-transparent border-none focus:ring-0 text-white font-black text-2xl w-full p-0 tabular-nums"
-           />
-           <div className="flex gap-2">
-              <button onClick={() => setBet(prev => prev * 2)} disabled={gameState === 'running'} className="text-[10px] font-black text-slate-500 bg-white/5 px-3 py-1.5 rounded-xl border border-white/10 active:bg-primary transition-all">x2</button>
-              <button onClick={() => setBet(prev => Math.floor(prev / 2))} disabled={gameState === 'running'} className="text-[10px] font-black text-slate-500 bg-white/5 px-3 py-1.5 rounded-xl border border-white/10 active:bg-primary transition-all">1/2</button>
-           </div>
+        <div className="w-full max-w-[400px] bg-[#1a0606] rounded-[3rem] border border-white/10 p-6 space-y-5 shadow-2xl shadow-black/60 mb-6">
+          <div className="flex items-center gap-3 h-14 bg-white/5 rounded-2xl border border-white/10 px-6 focus-within:border-primary/50 transition-colors">
+              <span className="text-slate-600 font-black text-lg mr-2">$</span>
+              <input type="number" value={bet} onChange={(e) => setBet(Number(e.target.value))} disabled={gameState === 'running'} className="bg-transparent border-none focus:ring-0 text-white font-black text-xl w-full p-0 tabular-nums" />
+          </div>
+
+          {gameState === 'running' ? (
+            <button onClick={handleCashOut} className="w-full h-20 bg-emerald-500 text-white rounded-[2rem] font-black uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all text-base flex flex-col items-center justify-center gap-0.5">
+              <span className="text-[9px] font-black opacity-80">CASH OUT</span>
+              <span className="text-xl tabular-nums tracking-tighter">${(bet * multiplier).toFixed(2)}</span>
+            </button>
+          ) : (
+            <button onClick={startNewGame} disabled={balance < bet} className="w-full h-20 bg-primary text-white rounded-[2rem] font-black uppercase tracking-[0.3em] text-lg shadow-xl active:scale-95 transition-all disabled:opacity-30 border-b-4 border-red-800">
+              BET
+            </button>
+          )}
         </div>
-
-        {gameState === 'running' ? (
-          <button 
-            onClick={handleCashOut}
-            className="w-full h-20 bg-emerald-500 text-white rounded-[2.5rem] font-black uppercase shadow-[0_15px_40px_rgba(16,185,129,0.3)] transform transition-all active:scale-95 flex flex-col items-center justify-center gap-1"
-          >
-            <span className="text-xs opacity-80 font-black tracking-[0.2em]">CASH OUT</span>
-            <span className="text-2xl font-bold tracking-tighter tabular-nums">${(bet * multiplier).toFixed(2)}</span>
-          </button>
-        ) : (
-          <button 
-            onClick={startNewGame}
-            disabled={balance < bet}
-            className="w-full h-20 bg-gradient-to-r from-primary via-red-600 to-primary text-white rounded-[2.5rem] font-black uppercase shadow-[0_15px_40px_rgba(234,42,51,0.4)] active:scale-95 transform transition-all text-xl tracking-[0.3em] disabled:opacity-30"
-          >
-            BET
-          </button>
-        )}
-      </div>
+      </main>
     </div>
   );
 };
