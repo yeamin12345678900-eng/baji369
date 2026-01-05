@@ -72,11 +72,8 @@ const App: React.FC = () => {
     setIsIOS(ios);
 
     window.addEventListener('beforeinstallprompt', (e) => {
-      // Prevent the mini-infobar from appearing on mobile
       e.preventDefault();
-      // Stash the event so it can be triggered later.
       setDeferredPrompt(e);
-      console.log('beforeinstallprompt event was fired and saved.');
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -140,11 +137,6 @@ const App: React.FC = () => {
           if (updatedProfile) {
             setProfile(updatedProfile);
             setBalance(Number(updatedProfile.balance) || 0);
-            
-            if (updatedProfile.status === 'blocked') {
-              supabase.auth.signOut();
-              setActiveToast({ title: "Account Blocked", desc: "Your account has been suspended." });
-            }
           }
         }
       )
@@ -174,23 +166,14 @@ const App: React.FC = () => {
 
   const handleNativeInstall = async () => {
     if (deferredPrompt) {
-      // Show the install prompt
       deferredPrompt.prompt();
-      // Wait for the user to respond to the prompt
       const { outcome } = await deferredPrompt.userChoice;
       if (outcome === 'accepted') {
-        console.log('User accepted the install prompt');
         setDeferredPrompt(null);
         setShowInstallModal(false);
-      } else {
-        console.log('User dismissed the install prompt');
       }
     } else {
-      // Fallback if prompt is not available
-      const msg = lang === 'en' 
-        ? "Installation prompt is currently unavailable. Please use your browser menu and select 'Add to Home Screen' manually." 
-        : "সরাসরি ইনস্টল বাটনটি এই মুহূর্তে কাজ করছে না। আপনার ব্রাউজারের থ্রি-ডট মেনু থেকে 'Add to Home Screen' অপশনটি ব্যবহার করুন।";
-      alert(msg);
+      alert("Installation prompt is currently unavailable.");
     }
   };
 

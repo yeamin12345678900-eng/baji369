@@ -1,14 +1,8 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-// Detect environment variables from Vite or process.env (Vercel)
-// Use type assertion (import.meta as any) to resolve "Property 'env' does not exist on type 'ImportMeta'"
 const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || process.env?.VITE_SUPABASE_URL || 'https://anwivgcqxakbyajfueth.supabase.co';
 const SUPABASE_ANON_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || process.env?.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFud2l2Z2NxeGFrYnlhamZ1ZXRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjczMzgxNDAsImV4cCI6MjA4MjkxNDE0MH0.BS_S6f9330G0wcx9X67ZbySxkIKuGBz5gh0tk13Z4eE';
-
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  console.error("Supabase credentials missing. Check your Environment Variables.");
-}
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -24,6 +18,59 @@ export const updateUserProfile = async (userId: string, updates: any) => {
     const { data, error } = await supabase.from('profiles').update(updates).eq('id', userId).select();
     return { data, error };
   } catch (err) { return { data: null, error: err }; }
+};
+
+// --- TRANSACTION FUNCTIONS ---
+
+export const submitDepositRequest = async (depositData: { 
+  user_id: string, 
+  amount: number, 
+  method: string, 
+  transaction_id: string 
+}) => {
+  return await supabase.from('transactions').insert([{
+    ...depositData,
+    status: 'pending',
+    type: 'deposit',
+    created_at: new Date().toISOString()
+  }]);
+};
+
+export const getPendingTransactions = async () => {
+  return await supabase
+    .from('transactions')
+    .select('*, profiles(first_name, last_name, email, balance)')
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false });
+};
+
+export const updateTransactionStatus = async (transactionId: string, status: 'approved' | 'rejected', userId: string, amount: number) => {
+  // 1. Update the transaction status
+  const { error: transError } = await supabase
+    .from('transactions')
+    .update({ status })
+    .eq('id', transactionId);
+
+  if (transError) throw transError;
+
+  // 2. If approved, update user balance
+  if (status === 'approved') {
+    const { data: profile } = await getUserProfile(userId);
+    if (profile) {
+      const newBalance = (profile.balance || 0) + amount;
+      await updateUserProfile(userId, { balance: newBalance });
+      
+      // 3. Send notification
+      await supabase.from('notifications').insert([{
+        user_id: userId,
+        title: 'Deposit Approved',
+        desc: `Your deposit of $${amount} has been approved and added to your balance.`,
+        type: 'win',
+        unread: true
+      }]);
+    }
+  }
+  return { success: true };
 };
 
 // --- ADMIN CONTROL FUNCTIONS ---

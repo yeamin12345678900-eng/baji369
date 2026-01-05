@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { supabase, getAllUsers, adminUpdateUser, updateGlobalSettings, getPlatformActivity, broadcastNotification } from '../services/supabase';
+import { supabase, getAllUsers, adminUpdateUser, updateGlobalSettings, getPlatformActivity, broadcastNotification, getPendingTransactions, updateTransactionStatus } from '../services/supabase';
 
 interface AdminPanelProps {
   onBack: () => void;
@@ -13,12 +13,13 @@ interface AdminPanelProps {
 const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSettings, gameStatus, onUpdateGameStatus }) => {
   const [users, setUsers] = useState<any[]>([]);
   const [activity, setActivity] = useState<any[]>([]);
+  const [pendingDeposits, setPendingDeposits] = useState<any[]>([]);
+  const [depositLogs, setDepositLogs] = useState<any[]>([]);
   const [stats, setStats] = useState({ totalStakes: 0, totalPayouts: 0, netProfit: 0, totalBets: 0, activeUsers: 0 });
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'rigging' | 'games' | 'users' | 'activity' | 'broadcast' | 'reports'>('reports');
+  const [activeTab, setActiveTab] = useState<'rigging' | 'games' | 'users' | 'activity' | 'broadcast' | 'reports' | 'deposits' | 'webhooks'>('reports');
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Notification Broadcast State
   const [notifTitle, setNotifTitle] = useState('');
   const [notifMsg, setNotifMsg] = useState('');
   const [isBroadcasting, setIsBroadcasting] = useState(false);
@@ -35,6 +36,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
         setUsers(userData);
         setStats(prev => ({ ...prev, activeUsers: userData.length }));
       }
+
+      const { data: deposits } = await getPendingTransactions();
+      if (deposits) setPendingDeposits(deposits);
+
+      // Fetch all transactions to see webhook success
+      const { data: allTransactions } = await supabase
+        .from('transactions')
+        .select('*, profiles(email)')
+        .order('created_at', { ascending: false });
+      if (allTransactions) setDepositLogs(allTransactions);
 
       const { data: bets } = await supabase.from('bets').select('*');
       if (bets) {
@@ -53,12 +64,21 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
     }
   };
 
+  const handleDepositAction = async (id: string, status: 'approved' | 'rejected', userId: string, amount: number) => {
+    try {
+      await updateTransactionStatus(id, status, userId, amount);
+      fetchData();
+    } catch (err) {
+      alert("Failed to update deposit.");
+    }
+  };
+
   const handleBroadcast = async () => {
     if (!notifTitle || !notifMsg) return;
     setIsBroadcasting(true);
     try {
       await broadcastNotification(notifTitle, notifMsg);
-      alert("Broadcast successful! All users will receive this message.");
+      alert("Broadcast successful!");
       setNotifTitle('');
       setNotifMsg('');
     } catch (err) {
@@ -95,18 +115,69 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
       <header className="sticky top-0 z-50 bg-[#1a0d0e]/95 backdrop-blur-md px-5 py-4 flex items-center justify-between border-b border-white/5">
         <div className="flex items-center gap-3">
           <button onClick={onBack} className="size-10 flex items-center justify-center text-slate-400 active:scale-90 transition-transform"><span className="material-symbols-outlined">arrow_back</span></button>
-          <h2 className="text-white text-lg font-black uppercase tracking-tight italic">Baji Control Center</h2>
+          <h2 className="text-white text-lg font-black uppercase tracking-tight italic">Admin Console</h2>
         </div>
         <button onClick={fetchData} className="size-9 rounded-full bg-white/5 flex items-center justify-center text-primary"><span className="material-symbols-outlined text-[20px]">refresh</span></button>
       </header>
 
       <div className="flex-1 overflow-y-auto no-scrollbar p-6 space-y-6 pb-32">
-        {/* Navigation Tabs */}
         <div className="flex bg-white/5 p-1 rounded-2xl border border-white/10 overflow-x-auto no-scrollbar gap-1">
-           {['reports', 'rigging', 'broadcast', 'activity', 'users', 'games'].map((t) => (
+           {['reports', 'deposits', 'webhooks', 'rigging', 'broadcast', 'activity', 'users', 'games'].map((t) => (
              <button key={t} onClick={() => setActiveTab(t as any)} className={`shrink-0 px-5 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${activeTab === t ? 'bg-primary text-white shadow-lg' : 'text-slate-500'}`}>{t}</button>
            ))}
         </div>
+
+        {/* WEBHOOKS LOGS TAB */}
+        {activeTab === 'webhooks' && (
+          <div className="space-y-4 animate-in slide-in-from-bottom">
+            <h3 className="text-white font-black text-sm uppercase px-2">Webhook History</h3>
+            <div className="space-y-3">
+               {depositLogs.map(log => (
+                 <div key={log.id} className="bg-white/5 border border-white/5 p-4 rounded-2xl flex items-center justify-between">
+                    <div>
+                       <p className="text-white text-[11px] font-black uppercase">{log.method} • ${log.amount}</p>
+                       <p className="text-slate-500 text-[8px] font-bold mt-1">{log.profiles?.email}</p>
+                    </div>
+                    <div className="text-right">
+                       <span className={`text-[8px] font-black px-2 py-0.5 rounded uppercase ${log.status === 'approved' ? 'bg-emerald-500/20 text-emerald-500' : 'bg-amber-500/20 text-amber-500'}`}>
+                          {log.status}
+                       </span>
+                    </div>
+                 </div>
+               ))}
+            </div>
+          </div>
+        )}
+
+        {/* DEPOSIT REQUESTS TAB */}
+        {activeTab === 'deposits' && (
+          <div className="space-y-4 animate-in slide-in-from-bottom">
+            <h3 className="text-white font-black text-sm uppercase px-2">Manual Verification ({pendingDeposits.length})</h3>
+            {pendingDeposits.length > 0 ? pendingDeposits.map(dep => (
+              <div key={dep.id} className="bg-white/5 border border-white/10 rounded-[2rem] p-6 space-y-4">
+                 <div className="flex justify-between items-start">
+                    <div>
+                       <p className="text-white font-black text-sm uppercase italic">{dep.method} - ৳{dep.amount}</p>
+                       <p className="text-slate-500 text-[9px] font-bold uppercase tracking-widest mt-1">TrxID: {dep.transaction_id}</p>
+                    </div>
+                    <div className="text-right">
+                       <p className="text-slate-400 text-[10px] font-black">{dep.profiles?.email}</p>
+                       <p className="text-slate-600 text-[8px] uppercase">{new Date(dep.created_at).toLocaleString()}</p>
+                    </div>
+                 </div>
+                 <div className="flex gap-2">
+                    <button onClick={() => handleDepositAction(dep.id, 'approved', dep.user_id, dep.amount)} className="flex-1 h-12 bg-emerald-500 text-white rounded-xl font-black text-[10px] uppercase shadow-lg shadow-emerald-900/20">Approve</button>
+                    <button onClick={() => handleDepositAction(dep.id, 'rejected', dep.user_id, dep.amount)} className="flex-1 h-12 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl font-black text-[10px] uppercase">Reject</button>
+                 </div>
+              </div>
+            )) : (
+              <div className="py-20 text-center opacity-20">
+                 <span className="material-symbols-outlined text-5xl">receipt_long</span>
+                 <p className="text-xs font-black uppercase mt-2">No pending requests</p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* FINANCIAL REPORTS TAB */}
         {activeTab === 'reports' && (
@@ -141,7 +212,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
            </div>
         )}
 
-        {/* BROADCAST TAB */}
+        {/* REST OF THE TABS RENDERED NORMALLY */}
         {activeTab === 'broadcast' && (
            <div className="space-y-4 animate-in slide-in-from-bottom duration-500">
               <div className="bg-[#1a0d0e] p-6 rounded-[2.5rem] border border-white/5 space-y-4 shadow-xl">
@@ -149,16 +220,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
                     <span className="material-symbols-outlined text-primary">campaign</span>
                     <h3 className="text-white font-black text-sm uppercase">Global Notification</h3>
                  </div>
-                 <input value={notifTitle} onChange={e => setNotifTitle(e.target.value)} placeholder="Notification Title (e.g. New Bonus!)" className="w-full h-14 bg-white/5 border border-white/10 rounded-2xl px-5 text-white font-bold outline-none focus:border-primary transition-all" />
-                 <textarea value={notifMsg} onChange={e => setNotifMsg(e.target.value)} placeholder="Message description..." className="w-full h-32 bg-white/5 border border-white/10 rounded-2xl p-5 text-white font-medium outline-none focus:border-primary transition-all resize-none" />
-                 <button onClick={handleBroadcast} disabled={isBroadcasting} className="w-full h-16 bg-primary text-white rounded-[2rem] font-black uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all flex items-center justify-center gap-3">
-                    {isBroadcasting ? <div className="size-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <><span className="material-symbols-outlined">send</span> BROADCAST NOW</>}
+                 <input value={notifTitle} onChange={e => setNotifTitle(e.target.value)} placeholder="Title" className="w-full h-14 bg-white/5 border border-white/10 rounded-2xl px-5 text-white font-bold outline-none" />
+                 <textarea value={notifMsg} onChange={e => setNotifMsg(e.target.value)} placeholder="Message" className="w-full h-32 bg-white/5 border border-white/10 rounded-2xl p-5 text-white font-medium outline-none resize-none" />
+                 <button onClick={handleBroadcast} disabled={isBroadcasting} className="w-full h-16 bg-primary text-white rounded-[2rem] font-black uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all">
+                    {isBroadcasting ? "Sending..." : "BROADCAST NOW"}
                  </button>
               </div>
            </div>
         )}
 
-        {/* ACTIVITY LOGS TAB */}
         {activeTab === 'activity' && (
            <div className="space-y-3 animate-in slide-in-from-bottom duration-500">
               {activity.map((log, i) => (
@@ -183,7 +253,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
            </div>
         )}
 
-        {/* RIGGING TAB */}
         {activeTab === 'rigging' && (
           <div className="bg-[#1a0d0e] border border-white/5 rounded-[2.5rem] overflow-hidden divide-y divide-white/5 shadow-xl">
             {Object.keys(settings).map(key => (
@@ -198,7 +267,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
           </div>
         )}
 
-        {/* USERS TAB */}
         {activeTab === 'users' && (
            <div className="space-y-4">
               <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search by email..." className="w-full h-14 bg-white/5 border border-white/10 rounded-2xl px-5 text-white outline-none focus:border-primary transition-all" />
@@ -228,7 +296,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
            </div>
         )}
 
-        {/* GAMES TAB */}
         {activeTab === 'games' && (
            <div className="bg-[#1a0d0e] border border-white/5 rounded-[2.5rem] divide-y divide-white/5 overflow-hidden">
               {Object.keys(gameStatus).map(id => (
