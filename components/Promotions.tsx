@@ -18,10 +18,6 @@ interface PromoOffer {
   isLive?: boolean;
 }
 
-/**
- * ADMIN PROTECTED PROMOTIONS
- * These offers look attractive but have very low actual cost to the admin.
- */
 const FEATURED_CAROUSEL = [
   {
     id: 1,
@@ -85,7 +81,7 @@ const OFFERS: PromoOffer[] = [
     id: 4,
     title: '1% Weekly Cashback',
     category: 'Loyalty',
-    desc: 'Get 1% cashback on net losses. Minimum loss $500 required.',
+    desc: 'Get 1% cashback on net losses. Min loss $500.',
     tag: 'CASHBACK',
     status: 'Auto-credit',
     ctaText: 'View Terms',
@@ -99,7 +95,7 @@ const OFFERS: PromoOffer[] = [
     id: 5,
     title: 'Refer & Earn $2',
     category: 'Referral',
-    desc: 'Invite friends. Get $2 when they deposit $200 or more.',
+    desc: 'Invite friends. Get $2 when they deposit $200+.',
     tag: 'REFERRAL',
     status: 'Unlimited',
     ctaText: 'Invite Friends',
@@ -148,7 +144,7 @@ const Promotions: React.FC<PromotionsProps> = ({ onNavigate }) => {
     setClaimingId(id);
     setTimeout(() => {
       setClaimingId(null);
-      alert('Your request has been sent for review. Term and conditions apply.');
+      alert('Request sent for review. T&C apply.');
     }, 1500);
   };
 
@@ -156,52 +152,52 @@ const Promotions: React.FC<PromotionsProps> = ({ onNavigate }) => {
     <div className="flex flex-col h-full bg-[#1a1111] animate-in fade-in duration-500 overflow-y-auto no-scrollbar pb-32 font-display">
       
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-[#1a1111]/95 backdrop-blur-md px-5 py-4 flex items-center justify-between border-b border-white/5">
+      <header className="sticky top-0 z-50 bg-[#1a1111]/95 backdrop-blur-md px-4 py-3.5 flex items-center justify-between border-b border-white/5">
         <div className="flex items-center gap-3">
-            <div className="size-8 rounded-lg bg-primary/20 flex items-center justify-center border border-primary/30">
-               <span className="material-symbols-outlined text-primary text-sm">local_activity</span>
+            <div className="size-8 rounded-lg bg-primary/20 flex items-center justify-center border border-primary/30 shrink-0">
+               <span className="material-symbols-outlined text-primary text-base">local_activity</span>
             </div>
-            <h2 className="text-xl font-black text-white tracking-tight">Promotions</h2>
+            <h2 className="text-lg font-black text-white tracking-tight">Promotions</h2>
         </div>
-        <button className="size-9 rounded-full bg-white/5 flex items-center justify-center text-slate-400 active:scale-90 transition-transform">
+        <button className="size-9 rounded-full bg-white/5 flex items-center justify-center text-slate-400 active:scale-90 transition-transform shrink-0">
           <span className="material-symbols-outlined text-[20px]">filter_list</span>
         </button>
       </header>
 
       {/* Featured Carousel */}
-      <section className="px-5 mt-4">
-        <div className="relative aspect-[16/8] rounded-[2rem] overflow-hidden border border-white/5 shadow-2xl">
+      <section className="px-4 mt-4">
+        <div className="relative aspect-[16/9] rounded-[2rem] overflow-hidden border border-white/5 shadow-2xl">
           {FEATURED_CAROUSEL.map((item, idx) => (
             <div 
               key={item.id}
               className={`absolute inset-0 transition-opacity duration-1000 ${idx === carouselIndex ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
             >
               <div className="absolute inset-0 bg-cover bg-center" style={{backgroundImage: `url("${item.image}")`}} />
-              <div className="absolute inset-0 bg-gradient-to-r from-black via-black/40 to-transparent p-6 flex flex-col justify-center">
-                <span className="bg-primary text-white text-[9px] font-black px-2 py-0.5 rounded-md w-fit mb-3 uppercase tracking-widest">{item.tag}</span>
-                <h3 className="text-2xl font-black text-white leading-tight mb-2">{item.title}</h3>
-                <p className="text-white/70 text-xs font-bold mb-4 max-w-[70%]">{item.desc}</p>
-                <button onClick={() => onNavigate('deposit')} className="bg-white text-primary text-[10px] font-black px-5 py-2 rounded-full w-fit uppercase tracking-widest shadow-xl active:scale-95">Check Offers</button>
+              <div className="absolute inset-0 bg-gradient-to-r from-black via-black/40 to-transparent p-5 flex flex-col justify-center">
+                <span className="bg-primary text-white text-[8px] font-black px-2 py-0.5 rounded w-fit mb-2 uppercase tracking-widest">{item.tag}</span>
+                <h3 className="text-xl font-black text-white leading-tight mb-1">{item.title}</h3>
+                <p className="text-white/70 text-[10px] font-bold mb-4 max-w-[80%] line-clamp-2">{item.desc}</p>
+                <button onClick={() => onNavigate('deposit')} className="bg-white text-primary text-[9px] font-black px-4 py-1.5 rounded-full w-fit uppercase tracking-widest shadow-xl">Check Offers</button>
               </div>
             </div>
           ))}
           {/* Dots */}
-          <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-1.5 z-20">
+          <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5 z-20">
             {FEATURED_CAROUSEL.map((_, idx) => (
-              <div key={idx} className={`h-1 rounded-full transition-all duration-300 ${idx === carouselIndex ? 'w-5 bg-primary' : 'w-2 bg-white/20'}`} />
+              <div key={idx} className={`h-1 rounded-full transition-all duration-300 ${idx === carouselIndex ? 'w-4 bg-primary' : 'w-1.5 bg-white/20'}`} />
             ))}
           </div>
         </div>
       </section>
 
       {/* Category Tabs */}
-      <div className="sticky top-[61px] z-40 bg-[#1a1111]/95 backdrop-blur-md py-4 mt-4 border-b border-white/5 shadow-sm">
-        <div className="flex gap-2 px-5 overflow-x-auto no-scrollbar">
+      <div className="sticky top-[57px] z-40 bg-[#1a1111]/95 backdrop-blur-md py-3 mt-4 border-b border-white/5 overflow-hidden">
+        <div className="flex gap-2 px-4 overflow-x-auto no-scrollbar">
           {CATEGORIES.map((cat) => (
             <button 
               key={cat}
               onClick={() => setActiveTab(cat)}
-              className={`shrink-0 h-9 px-5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 border ${
+              className={`shrink-0 h-8 px-4 rounded-full text-[9px] font-black uppercase tracking-widest transition-all active:scale-95 border ${
                 activeTab === cat 
                   ? 'bg-white border-white text-black shadow-lg shadow-white/5' 
                   : 'bg-white/5 border-white/10 text-slate-500'
@@ -214,7 +210,7 @@ const Promotions: React.FC<PromotionsProps> = ({ onNavigate }) => {
       </div>
 
       {/* Promotion List By Category */}
-      <div className="px-5 mt-6 flex flex-col gap-10">
+      <div className="px-4 mt-5 flex flex-col gap-8 overflow-hidden">
         {filteredSections.map((sectionName) => (
           <div key={sectionName} className="flex flex-col gap-4">
             <div className="flex items-center justify-between px-1">
@@ -224,60 +220,53 @@ const Promotions: React.FC<PromotionsProps> = ({ onNavigate }) => {
                   sectionName === 'Sports' ? 'text-blue-500' : 
                   sectionName === 'Casino' ? 'text-purple-500' : 'text-yellow-500'
                 }`}>
-                  {sectionName === 'Welcome' ? 'featured_seasonal' : 
+                  {sectionName === 'Welcome' ? 'stars' : 
                    sectionName === 'Sports' ? 'sports_soccer' : 
                    sectionName === 'Casino' ? 'casino' : 'loyalty'}
                 </span>
-                <h2 className="text-sm font-black text-white uppercase tracking-wider">{sectionName} Offers</h2>
+                <h2 className="text-[11px] font-black text-white uppercase tracking-wider">{sectionName} Offers</h2>
               </div>
-              <button className="text-[10px] font-black text-primary uppercase tracking-widest opacity-60">See All</button>
+              <button className="text-[9px] font-black text-primary uppercase tracking-widest opacity-60">See All</button>
             </div>
 
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3.5">
               {sections[sectionName]?.map((offer) => (
-                <div key={offer.id} className="bg-[#24191a] rounded-[2.5rem] p-6 border border-white/5 shadow-xl relative overflow-hidden group">
-                  {/* Promo Icon & Text Container */}
-                  <div className="flex gap-5 items-start">
-                    <div className={`size-20 rounded-[2rem] ${offer.iconBg} shrink-0 flex items-center justify-center shadow-2xl relative border border-white/5`}>
-                      <span className="material-symbols-outlined text-white text-3xl">{offer.iconName}</span>
+                <div key={offer.id} className="bg-[#24191a] rounded-[1.75rem] p-5 border border-white/5 shadow-lg relative overflow-hidden group">
+                  <div className="flex gap-4 items-start">
+                    <div className={`size-16 rounded-2xl ${offer.iconBg} shrink-0 flex items-center justify-center shadow-xl relative border border-white/5`}>
+                      <span className="material-symbols-outlined text-white text-2xl">{offer.iconName}</span>
                       {offer.isLive && (
-                        <div className="absolute -top-1 -right-1 flex h-4 w-4">
+                        <div className="absolute -top-1 -right-1 flex h-3 w-3">
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500 border border-[#24191a]"></span>
+                          <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500 border border-[#24191a]"></span>
                         </div>
                       )}
                     </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1.5">
-                        <span className="text-[9px] font-black text-primary uppercase tracking-[0.2em]">{offer.tag}</span>
-                        {offer.isLive && <span className="text-[8px] font-black text-red-500 uppercase tracking-widest bg-red-500/10 px-1.5 py-0.5 rounded">Live</span>}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className="text-[8px] font-black text-primary uppercase tracking-widest">{offer.tag}</span>
                       </div>
-                      <h3 className="text-white font-black text-lg leading-tight mb-2 tracking-tight">{offer.title}</h3>
-                      <p className="text-slate-400 text-[11px] leading-relaxed font-bold">{offer.desc}</p>
+                      <h3 className="text-white font-black text-sm leading-tight mb-1 truncate">{offer.title}</h3>
+                      <p className="text-slate-400 text-[10px] leading-tight font-bold line-clamp-2">{offer.desc}</p>
                     </div>
                   </div>
 
-                  {/* Footer & CTA */}
-                  <div className="mt-6 pt-6 border-t border-white/5 flex flex-col gap-4">
+                  <div className="mt-4 pt-4 border-t border-white/5 flex flex-col gap-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5">
-                        {offer.footerIcon && <span className="material-symbols-outlined text-red-500 text-[16px]">{offer.footerIcon}</span>}
-                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{offer.status}</span>
+                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{offer.status}</span>
                       </div>
-                      <span className="text-[9px] font-black uppercase text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">Verified</span>
+                      <span className="text-[8px] font-black uppercase text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">Verified</span>
                     </div>
                     <button 
                       onClick={() => handleClaim(offer.id)}
                       disabled={claimingId === offer.id}
-                      className={`w-full h-14 rounded-2xl ${offer.ctaColor} text-white text-xs font-black uppercase tracking-[0.2em] shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2`}
+                      className={`w-full h-12 rounded-xl ${offer.ctaColor} text-white text-[10px] font-black uppercase tracking-widest shadow-md transition-all active:scale-[0.98] flex items-center justify-center gap-2`}
                     >
                       {claimingId === offer.id ? (
-                        <div className="size-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                        <div className="size-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                       ) : (
-                        <>
-                          {offer.ctaText}
-                          {offer.category === 'Referral' && <span className="material-symbols-outlined text-sm">share</span>}
-                        </>
+                        offer.ctaText
                       )}
                     </button>
                   </div>
@@ -288,20 +277,11 @@ const Promotions: React.FC<PromotionsProps> = ({ onNavigate }) => {
         ))}
       </div>
 
-      {/* T&C Footer Notice */}
-      <div className="px-10 mt-6 mb-10 text-center opacity-40">
-         <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest leading-relaxed">
-            * All bonuses are subject to 50x wagering requirements and management approval. Baji369 reserves the right to modify terms at any time.
+      <div className="px-8 mt-6 mb-10 text-center opacity-40">
+         <p className="text-[8px] text-slate-500 font-black uppercase tracking-widest leading-relaxed">
+            * T&C apply. Managed by Baji369 Admin.
          </p>
       </div>
-
-      {/* Empty State */}
-      {filteredSections.length === 0 && (
-        <div className="flex-1 flex flex-col items-center justify-center py-24 opacity-20">
-          <span className="material-symbols-outlined text-7xl mb-4">no_accounts</span>
-          <p className="text-sm font-black uppercase tracking-widest">No promotions found</p>
-        </div>
-      )}
     </div>
   );
 };
