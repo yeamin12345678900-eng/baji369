@@ -32,19 +32,18 @@ const Deposit: React.FC<DepositProps> = ({ lang, balance, onBack, onDepositSucce
     const setupPaddle = () => {
       if (typeof window.Paddle !== 'undefined' && !initRef.current) {
         try {
-          // IMPORTANT: Set environment to sandbox BEFORE Initialize
+          // Set environment to sandbox
           window.Paddle.Environment.set('sandbox');
           
           window.Paddle.Initialize({ 
-            token: 'test_30377928de7016923db465cac6d', // Sandbox Token
+            token: 'test_30377928de7016923db465cac6d', 
             eventCallback: (event: any) => {
-              console.log("Paddle Global Event:", event.name, event.data);
+              console.log("Paddle Event:", event.name, event.data);
             }
           });
           
           initRef.current = true;
           setPaddleStatus('ready');
-          console.log("Paddle v2 Sandbox Initialized successfully.");
         } catch (e) {
           console.error("Paddle Initialization Failed:", e);
           setPaddleStatus('error');
@@ -52,7 +51,6 @@ const Deposit: React.FC<DepositProps> = ({ lang, balance, onBack, onDepositSucce
       }
     };
 
-    // Poll for Paddle availability
     const checkInterval = setInterval(() => {
       if (window.Paddle) {
         setupPaddle();
@@ -63,19 +61,16 @@ const Deposit: React.FC<DepositProps> = ({ lang, balance, onBack, onDepositSucce
     return () => clearInterval(checkInterval);
   }, []);
 
-  // Pro tip: Price ID-ti obossoi apnar sandbox dashboard er hote hobe.
-  // Jodi ek-i price ID prottek package er jonno use koren, tahole user joto deposit e click koruk, 
-  // checkout e oi ek-i amount dekhabe.
-  const pricingPlans = [
-    { amount: 10, label: 'Starter Pack', bonus: '+$1 Bonus', priceId: 'pri_01ke6f0feh7aprvx2zzcd6yr6m' },
-    { amount: 50, label: 'Pro Gamer Pack', bonus: '+$5 Bonus', priceId: 'pri_01ke6f0feh7aprvx2zzcd6yr6m' },
-    { amount: 100, label: 'VIP Credits', bonus: '+$15 Bonus', priceId: 'pri_01ke6f0feh7aprvx2zzcd6yr6m' },
-    { amount: 500, label: 'Elite Whale', bonus: '+$100 Bonus', priceId: 'pri_01ke6f0feh7aprvx2zzcd6yr6m' },
-  ];
+  // Show only Pro Gamer Pack ($50) without bonus
+  const activePlan = { 
+    amount: 50, 
+    label: 'Pro Gamer Pack', 
+    priceId: 'pri_01ke6f0feh7aprvx2zzcd6yr6m' 
+  };
 
   const openCheckout = (priceId: string, amount: number) => {
     if (paddleStatus !== 'ready') {
-      alert("Payment system is not ready yet. Please wait...");
+      alert("Payment system is not ready yet. Please wait a moment.");
       return;
     }
 
@@ -96,7 +91,7 @@ const Deposit: React.FC<DepositProps> = ({ lang, balance, onBack, onDepositSucce
         },
         items: [
           {
-            priceId: priceId, // Ensure this ID is exactly what's in Sandbox dashboard
+            priceId: priceId,
             quantity: 1,
           },
         ],
@@ -122,6 +117,7 @@ const Deposit: React.FC<DepositProps> = ({ lang, balance, onBack, onDepositSucce
     } catch (err) {
       console.error("Failed to open checkout:", err);
       setIsProcessing(false);
+      alert("Something went wrong opening the checkout. Please refresh.");
     }
   };
 
@@ -132,73 +128,78 @@ const Deposit: React.FC<DepositProps> = ({ lang, balance, onBack, onDepositSucce
           <span className="material-symbols-outlined">arrow_back</span>
         </button>
         <div className="flex flex-col items-center">
-            <h2 className="text-white text-lg font-black tracking-tight uppercase italic">Deposit Funds</h2>
+            <h2 className="text-white text-lg font-black tracking-tight uppercase italic">Deposit</h2>
             <div className="flex items-center gap-1.5">
                <span className={`size-1.5 rounded-full ${paddleStatus === 'ready' ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></span>
                <p className="text-[7px] text-slate-500 font-black uppercase tracking-[0.2em]">
-                 {paddleStatus === 'ready' ? 'Paddle Sandbox Active' : 'Connecting SDK...'}
+                 {paddleStatus === 'ready' ? 'Secure Sandbox Connection' : 'Initializing...'}
                </p>
             </div>
         </div>
         <div className="size-11"></div>
       </header>
 
-      <main className="flex-1 px-6 pt-8 pb-32 overflow-y-auto no-scrollbar">
-        <div className="text-center mb-10">
-           <h3 className="text-white text-2xl font-black italic tracking-tighter">Select Package</h3>
-           <p className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.2em] mt-2">Verified Secure Sandbox Payments</p>
+      <main className="flex-1 px-6 pt-12 pb-32 overflow-y-auto no-scrollbar flex flex-col items-center">
+        <div className="text-center mb-10 w-full">
+           <h3 className="text-white text-2xl font-black italic tracking-tighter uppercase">Selected Package</h3>
+           <p className="text-slate-500 text-[9px] font-bold uppercase tracking-[0.3em] mt-2 italic">Standard Elite Credits</p>
         </div>
 
         {paddleStatus === 'error' && (
-          <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-center">
-             <p className="text-red-500 text-[10px] font-black uppercase">Initialization Error</p>
-             <p className="text-slate-400 text-[9px] mt-1">Please check your internet or browser ad-blockers.</p>
+          <div className="w-full mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-center">
+             <p className="text-red-500 text-[10px] font-black uppercase tracking-widest">Connection Error</p>
+             <p className="text-slate-400 text-[9px] mt-1">Please check your internet or retry.</p>
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-4">
-           {pricingPlans.map((plan, idx) => (
-             <div 
-              key={idx}
-              className={`bg-white/5 border rounded-[2.5rem] p-6 transition-all group relative overflow-hidden ${idx === 1 ? 'border-primary shadow-2xl shadow-primary/10' : 'border-white/10'}`}
-             >
-                <div className="flex items-center justify-between relative z-10">
-                   <div>
-                      <h4 className="text-white font-black text-xl uppercase tracking-tight">{plan.label}</h4>
-                      <p className="text-emerald-500 text-[10px] font-black uppercase mt-1">{plan.bonus}</p>
-                   </div>
-                   <div className="text-right">
-                      <p className="text-white text-3xl font-black italic tracking-tighter">${plan.amount}</p>
-                   </div>
+        <div className="w-full max-w-[340px]">
+           <div className="bg-gradient-to-b from-[#1a1313] to-black border border-primary shadow-2xl shadow-primary/10 rounded-[3rem] p-8 transition-all group relative overflow-hidden text-center">
+              {/* Decorative Glow */}
+              <div className="absolute -top-10 -right-10 size-32 bg-primary/5 rounded-full blur-3xl"></div>
+              
+              <div className="relative z-10 mb-8">
+                <div className="size-16 rounded-3xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto mb-4">
+                  <span className="material-symbols-outlined text-primary text-4xl filled">workspace_premium</span>
                 </div>
+                <h4 className="text-white font-black text-2xl uppercase tracking-tighter">{activePlan.label}</h4>
+                <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-1">Single Purchase</p>
+              </div>
 
-                <button 
-                  onClick={() => openCheckout(plan.priceId, plan.amount)}
-                  disabled={isProcessing || paddleStatus !== 'ready'}
-                  className={`w-full mt-6 h-14 rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] transition-all active:scale-95 flex items-center justify-center gap-3 ${idx === 1 ? 'bg-primary text-white' : 'bg-white/10 text-white border border-white/10'}`}
-                >
-                  {isProcessing ? (
-                    <div className="size-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                  ) : (
-                    <>
-                      <span className="material-symbols-outlined text-[18px]">payments</span>
-                      <span>Buy ${plan.amount} Pack</span>
-                    </>
-                  )}
-                </button>
-             </div>
-           ))}
+              <div className="relative z-10 mb-8">
+                 <p className="text-white text-5xl font-black italic tracking-tighter">${activePlan.amount}</p>
+                 <p className="text-slate-600 text-[9px] font-bold uppercase tracking-[0.2em] mt-2">Elite Gaming Credits</p>
+              </div>
+
+              <button 
+                onClick={() => openCheckout(activePlan.priceId, activePlan.amount)}
+                disabled={isProcessing || paddleStatus !== 'ready'}
+                className="w-full h-16 rounded-2xl font-black uppercase tracking-[0.2em] text-[11px] transition-all active:scale-95 flex items-center justify-center gap-3 bg-primary text-white shadow-xl shadow-primary/20"
+              >
+                {isProcessing ? (
+                  <div className="size-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-[18px]">payments</span>
+                    <span>Deposit ${activePlan.amount}</span>
+                  </>
+                )}
+              </button>
+           </div>
         </div>
 
-        <div className="mt-8 p-6 bg-white/5 border border-white/5 rounded-[2rem] flex items-center gap-4">
-           <div className="size-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500">
-              <span className="material-symbols-outlined text-[20px]">shield</span>
+        <div className="mt-12 p-6 bg-white/5 border border-white/5 rounded-[2rem] flex items-center gap-4 w-full max-w-[340px]">
+           <div className="size-10 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500 border border-emerald-500/20">
+              <span className="material-symbols-outlined text-[20px]">verified</span>
            </div>
            <div>
-              <p className="text-white text-[10px] font-black uppercase tracking-tight">Vercel Domain Approved</p>
-              <p className="text-slate-500 text-[9px] font-bold leading-tight uppercase">baji369.vercel.app is authorized in Paddle Dashboard.</p>
+              <p className="text-white text-[10px] font-black uppercase tracking-tight">Vercel Authorized</p>
+              <p className="text-slate-500 text-[9px] font-bold leading-tight uppercase">Payment processed securely via approved domain.</p>
            </div>
         </div>
+
+        <p className="mt-10 text-[8px] text-slate-700 font-black uppercase tracking-[0.4em] text-center max-w-[200px] leading-relaxed">
+           No hidden fees. Instant credit update after verification.
+        </p>
       </main>
     </div>
   );
