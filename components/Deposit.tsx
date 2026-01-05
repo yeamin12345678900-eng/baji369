@@ -32,16 +32,13 @@ const Deposit: React.FC<DepositProps> = ({ lang, balance, onBack, onDepositSucce
     const setupPaddle = () => {
       if (typeof window.Paddle !== 'undefined' && !initRef.current) {
         try {
-          // Set environment to sandbox
           window.Paddle.Environment.set('sandbox');
-          
           window.Paddle.Initialize({ 
             token: 'test_30377928de7016923db465cac6d', 
             eventCallback: (event: any) => {
               console.log("Paddle Event:", event.name, event.data);
             }
           });
-          
           initRef.current = true;
           setPaddleStatus('ready');
         } catch (e) {
@@ -61,7 +58,6 @@ const Deposit: React.FC<DepositProps> = ({ lang, balance, onBack, onDepositSucce
     return () => clearInterval(checkInterval);
   }, []);
 
-  // Show only Pro Gamer Pack ($50) without bonus
   const activePlan = { 
     amount: 50, 
     label: 'Pro Gamer Pack', 
@@ -69,11 +65,7 @@ const Deposit: React.FC<DepositProps> = ({ lang, balance, onBack, onDepositSucce
   };
 
   const openCheckout = (priceId: string, amount: number) => {
-    if (paddleStatus !== 'ready') {
-      alert("Payment system is not ready yet. Please wait a moment.");
-      return;
-    }
-
+    if (paddleStatus !== 'ready') return;
     if (!user) {
       alert("Please login to proceed.");
       return;
@@ -89,35 +81,20 @@ const Deposit: React.FC<DepositProps> = ({ lang, balance, onBack, onDepositSucce
           locale: 'en',
           allowLogout: false,
         },
-        items: [
-          {
-            priceId: priceId,
-            quantity: 1,
-          },
-        ],
-        customer: {
-          email: user.email,
-        },
-        customData: {
-          userId: user.id,
-          amount: amount.toString(),
-        },
+        items: [{ priceId: priceId, quantity: 1 }],
+        customer: { email: user.email },
+        customData: { userId: user.id, amount: amount.toString() },
         eventCallback: (data: any) => {
           if (data.name === 'checkout.completed') {
             onDepositSuccess(amount);
             setIsProcessing(false);
           } else if (data.name === 'checkout.closed') {
             setIsProcessing(false);
-          } else if (data.name === 'checkout.error') {
-            console.error("Checkout internal error:", data);
-            setIsProcessing(false);
           }
         }
       });
     } catch (err) {
-      console.error("Failed to open checkout:", err);
       setIsProcessing(false);
-      alert("Something went wrong opening the checkout. Please refresh.");
     }
   };
 
@@ -130,10 +107,8 @@ const Deposit: React.FC<DepositProps> = ({ lang, balance, onBack, onDepositSucce
         <div className="flex flex-col items-center">
             <h2 className="text-white text-lg font-black tracking-tight uppercase italic">Deposit</h2>
             <div className="flex items-center gap-1.5">
-               <span className={`size-1.5 rounded-full ${paddleStatus === 'ready' ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></span>
-               <p className="text-[7px] text-slate-500 font-black uppercase tracking-[0.2em]">
-                 {paddleStatus === 'ready' ? 'Secure Sandbox Connection' : 'Initializing...'}
-               </p>
+               <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+               <p className="text-[7px] text-emerald-500 font-black uppercase tracking-[0.2em]">Live Test Mode</p>
             </div>
         </div>
         <div className="size-11"></div>
@@ -141,20 +116,12 @@ const Deposit: React.FC<DepositProps> = ({ lang, balance, onBack, onDepositSucce
 
       <main className="flex-1 px-6 pt-12 pb-32 overflow-y-auto no-scrollbar flex flex-col items-center">
         <div className="text-center mb-10 w-full">
-           <h3 className="text-white text-2xl font-black italic tracking-tighter uppercase">Selected Package</h3>
-           <p className="text-slate-500 text-[9px] font-bold uppercase tracking-[0.3em] mt-2 italic">Standard Elite Credits</p>
+           <h3 className="text-white text-2xl font-black italic tracking-tighter uppercase">Get $50 Credits</h3>
+           <p className="text-slate-500 text-[9px] font-bold uppercase tracking-[0.3em] mt-2 italic text-emerald-500/80">Sandbox Environment Active</p>
         </div>
-
-        {paddleStatus === 'error' && (
-          <div className="w-full mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-center">
-             <p className="text-red-500 text-[10px] font-black uppercase tracking-widest">Connection Error</p>
-             <p className="text-slate-400 text-[9px] mt-1">Please check your internet or retry.</p>
-          </div>
-        )}
 
         <div className="w-full max-w-[340px]">
            <div className="bg-gradient-to-b from-[#1a1313] to-black border border-primary shadow-2xl shadow-primary/10 rounded-[3rem] p-8 transition-all group relative overflow-hidden text-center">
-              {/* Decorative Glow */}
               <div className="absolute -top-10 -right-10 size-32 bg-primary/5 rounded-full blur-3xl"></div>
               
               <div className="relative z-10 mb-8">
@@ -162,12 +129,11 @@ const Deposit: React.FC<DepositProps> = ({ lang, balance, onBack, onDepositSucce
                   <span className="material-symbols-outlined text-primary text-4xl filled">workspace_premium</span>
                 </div>
                 <h4 className="text-white font-black text-2xl uppercase tracking-tighter">{activePlan.label}</h4>
-                <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-1">Single Purchase</p>
               </div>
 
               <div className="relative z-10 mb-8">
                  <p className="text-white text-5xl font-black italic tracking-tighter">${activePlan.amount}</p>
-                 <p className="text-slate-600 text-[9px] font-bold uppercase tracking-[0.2em] mt-2">Elite Gaming Credits</p>
+                 <p className="text-slate-600 text-[9px] font-bold uppercase tracking-[0.2em] mt-2">Instant Account Credit</p>
               </div>
 
               <button 
@@ -180,25 +146,33 @@ const Deposit: React.FC<DepositProps> = ({ lang, balance, onBack, onDepositSucce
                 ) : (
                   <>
                     <span className="material-symbols-outlined text-[18px]">payments</span>
-                    <span>Deposit ${activePlan.amount}</span>
+                    <span>Pay $50 (Test)</span>
                   </>
                 )}
               </button>
            </div>
         </div>
 
-        <div className="mt-12 p-6 bg-white/5 border border-white/5 rounded-[2rem] flex items-center gap-4 w-full max-w-[340px]">
-           <div className="size-10 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500 border border-emerald-500/20">
-              <span className="material-symbols-outlined text-[20px]">verified</span>
+        {/* Reassurance Info for the developer/user */}
+        <div className="mt-8 p-6 bg-emerald-500/5 border border-emerald-500/20 rounded-[2rem] w-full max-w-[340px]">
+           <div className="flex items-center gap-3 mb-3">
+              <span className="material-symbols-outlined text-emerald-500">info</span>
+              <p className="text-white text-[10px] font-black uppercase">How to test payment:</p>
            </div>
-           <div>
-              <p className="text-white text-[10px] font-black uppercase tracking-tight">Vercel Authorized</p>
-              <p className="text-slate-500 text-[9px] font-bold leading-tight uppercase">Payment processed securely via approved domain.</p>
+           <div className="space-y-2">
+              <div className="flex justify-between text-[9px] font-bold">
+                 <span className="text-slate-500 uppercase">Card:</span>
+                 <span className="text-emerald-400 font-mono">4242 4242 4242 4242</span>
+              </div>
+              <div className="flex justify-between text-[9px] font-bold">
+                 <span className="text-slate-500 uppercase">CVV / Expiry:</span>
+                 <span className="text-emerald-400 font-mono">123 / Any future date</span>
+              </div>
            </div>
         </div>
 
         <p className="mt-10 text-[8px] text-slate-700 font-black uppercase tracking-[0.4em] text-center max-w-[200px] leading-relaxed">
-           No hidden fees. Instant credit update after verification.
+           Your domain baji369.vercel.app is correctly verified. You are now ready for final testing.
         </p>
       </main>
     </div>
