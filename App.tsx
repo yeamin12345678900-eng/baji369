@@ -181,6 +181,8 @@ const App: React.FC = () => {
     setBalance(newBalance);
     if (user && !isDemo) {
       await supabase.from('profiles').update({ balance: newBalance }).eq('id', user.id);
+      // Wait 500ms and re-fetch to ensure local state is 100% correct with DB
+      setTimeout(() => fetchUserData(user.id), 500);
     }
   };
 
@@ -239,7 +241,12 @@ const App: React.FC = () => {
           {currentView === 'game-detail' && <GameDetail balance={balance} gameId={1} onBack={() => navigate('casino')} onUpdateBalance={updateBalance} />}
           {currentView === 'promotions' && <Promotions onNavigate={navigate} />}
           {currentView === 'wallet' && <Wallet lang={lang} balance={balance} onBack={() => navigate('dashboard')} onDepositClick={() => navigate('deposit')} onWithdrawClick={() => navigate('withdraw')} onHistoryClick={() => navigate('my-bets')} />}
-          {currentView === 'deposit' && <Deposit lang={lang} balance={balance} onBack={() => navigate('wallet')} onDepositSuccess={(amt) => { updateBalance(balance + amt); navigate('wallet'); }} />}
+          {currentView === 'deposit' && <Deposit lang={lang} balance={balance} onBack={() => navigate('wallet')} onDepositSuccess={(amt) => { 
+            const newBal = balance + amt;
+            updateBalance(newBal); 
+            setActiveToast({ title: "Deposit Successful", desc: `$${amt} has been added to your balance.` });
+            navigate('wallet'); 
+          }} />}
           {currentView === 'withdraw' && <Withdraw lang={lang} balance={balance} onBack={() => navigate('wallet')} onWithdrawSuccess={(amt) => { updateBalance(balance - amt); navigate('wallet'); }} />}
           {currentView === 'notifications' && <Notifications lang={lang} onBack={() => navigate('dashboard')} />}
           {currentView === 'my-bets' && <MyBets lang={lang} user={user} onBack={() => navigate('dashboard')} onNavigateHome={() => navigate('dashboard')} />}
