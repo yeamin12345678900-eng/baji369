@@ -20,6 +20,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
   const [activeTab, setActiveTab] = useState<'rigging' | 'games' | 'users' | 'activity' | 'broadcast' | 'reports' | 'deposits' | 'withdrawals' | 'payments'>('reports');
   const [searchQuery, setSearchQuery] = useState('');
   
+  const [dbError, setDbError] = useState<string | null>(null);
+
   const [notifTitle, setNotifTitle] = useState('');
   const [notifMsg, setNotifMsg] = useState('');
   const [isBroadcasting, setIsBroadcasting] = useState(false);
@@ -43,13 +45,17 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
 
   const fetchData = async () => {
     setIsLoading(true);
+    setDbError(null);
     try {
       // Use individual try-catches so one table failure doesn't block others
       
       // 1. Users
       const { data: uData, error: uErr } = await getAllUsers();
-      if (uErr) console.error("User Fetch Error:", formatError(uErr));
-      else if (uData) {
+      if (uErr) {
+        const msg = formatError(uErr);
+        if (msg.startsWith('DB_')) setDbError(msg);
+        console.error("User Fetch Error:", msg);
+      } else if (uData) {
         setUsers(uData);
         setStats(prev => ({ ...prev, activeUsers: uData.length }));
       }
@@ -58,8 +64,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
       const { data: dData, error: dErr } = await getPendingTransactions();
       if (dErr) {
         const msg = formatError(dErr);
+        if (msg.startsWith('DB_')) setDbError(msg);
         console.error("Deposit Fetch Error:", msg);
-        if (activeTab === 'deposits') alert(`Deposit Error: ${msg}\n\nDiagnosis: Check if table "transactions" exists and VPN is off.`);
       } else if (dData) {
         setPendingDeposits(dData);
       }
@@ -68,8 +74,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
       const { data: wData, error: wErr } = await getPendingWithdrawals();
       if (wErr) {
         const msg = formatError(wErr);
+        if (msg.startsWith('DB_')) setDbError(msg);
         console.error("Withdraw Fetch Error:", msg);
-        if (activeTab === 'withdrawals') alert(`Withdraw Error: ${msg}\n\nDiagnosis: Check if table "transactions" exists and VPN is off.`);
       } else if (wData) {
         setPendingWithdraws(wData);
       }
@@ -100,6 +106,47 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const renderDbFixAssistant = () => {
+    if (!dbError) return null;
+    
+    let sql = "";
+    let reason = "";
+
+    if (dbError === 'DB_MISSING_CREATED_AT') {
+      sql = "ALTER TABLE profiles ADD COLUMN created_at TIMESTAMP WITH TIME ZONE DEFAULT now();";
+      reason = "Profiles টেবিলে 'created_at' কলামটি নেই।";
+    } else if (dbError === 'DB_MISSING_EMAIL') {
+      sql = "ALTER TABLE profiles ADD COLUMN email TEXT;";
+      reason = "Profiles টেবিলে 'email' কলামটি নেই।";
+    } else if (dbError === 'DB_MISSING_AVATAR') {
+      sql = "ALTER TABLE profiles ADD COLUMN avatar_url TEXT;";
+      reason = "Profiles টেবিলে 'avatar_url' কলামটি নেই।";
+    }
+
+    return (
+      <div className="mx-6 mb-6 p-5 bg-red-500/10 border border-red-500/20 rounded-[2rem] animate-in zoom-in">
+        <div className="flex items-start gap-4">
+          <div className="size-10 bg-red-500/20 rounded-full flex items-center justify-center shrink-0">
+             <span className="material-symbols-outlined text-red-500">database</span>
+          </div>
+          <div className="flex-1 space-y-3">
+             <h4 className="text-red-500 font-black text-[10px] uppercase tracking-widest">Database Fix Required</h4>
+             <p className="text-slate-400 text-[11px] font-bold leading-tight">{reason} নিচের কোডটি কপি করে Supabase SQL Editor-এ রান করুন।</p>
+             <div className="bg-black/60 p-4 rounded-xl border border-white/5 relative group">
+                <code className="text-emerald-400 text-[9px] font-mono block break-all select-all">{sql}</code>
+                <button 
+                  onClick={() => { navigator.clipboard.writeText(sql); alert("SQL Copied!"); }}
+                  className="absolute top-2 right-2 size-8 bg-white/5 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <span className="material-symbols-outlined text-[16px]">content_copy</span>
+                </button>
+             </div>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const handleSavePayments = async () => {
@@ -195,6 +242,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
       </header>
 
       <div className="flex-1 overflow-y-auto no-scrollbar p-6 space-y-6 pb-32">
+        {renderDbFixAssistant()}
+
         <div className="flex bg-white/5 p-1 rounded-2xl border border-white/10 overflow-x-auto no-scrollbar gap-1">
            {['reports', 'deposits', 'withdrawals', 'payments', 'rigging', 'broadcast', 'activity', 'users', 'games'].map((t) => (
              <button key={t} onClick={() => setActiveTab(t as any)} className={`shrink-0 px-5 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${activeTab === t ? 'bg-primary text-white shadow-lg' : 'text-slate-500'}`}>{t}</button>
@@ -267,7 +316,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
                        <p className="text-white text-lg font-black tracking-widest mt-1">{wd.phone_number}</p>
                     </div>
                     <div className="text-right">
-                       <p className="text-slate-400 text-[9px] font-black uppercase">{wd.profiles?.email}</p>
+                       <p className="text-slate-400 text-[9px] font-black uppercase">{wd.profiles?.email || 'No Email'}</p>
                        <p className="text-slate-600 text-[7px] uppercase mt-1">{new Date(wd.created_at).toLocaleString()}</p>
                     </div>
                  </div>
@@ -296,7 +345,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
                        <p className="text-slate-500 text-[9px] font-bold uppercase tracking-widest mt-1">TrxID: {dep.transaction_id}</p>
                     </div>
                     <div className="text-right">
-                       <p className="text-slate-400 text-[10px] font-black">{dep.profiles?.email}</p>
+                       <p className="text-slate-400 text-[10px] font-black">{dep.profiles?.email || 'No Email'}</p>
                        <p className="text-slate-600 text-[8px] uppercase">{new Date(dep.created_at).toLocaleString()}</p>
                     </div>
                  </div>

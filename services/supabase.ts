@@ -7,13 +7,30 @@ const SUPABASE_ANON_KEY = ((import.meta as any).env?.VITE_SUPABASE_ANON_KEY) || 
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// Helper to format Supabase errors into readable strings
+// Helper to format Supabase errors into readable strings with specific SQL fix suggestions
 export const formatError = (error: any): string => {
   if (!error) return 'Unknown Error';
-  if (error.message === 'Failed to fetch') {
-    return 'NETWORK ERROR: Connection to Supabase was blocked. Please turn off VPN, Ad-blocker, and ensure your internet is stable.';
+  
+  // Extract message from error object or string
+  const message = typeof error === 'string' ? error : (error.message || JSON.stringify(error));
+  
+  if (message.includes('Failed to fetch') || message.includes('TypeError')) {
+    return 'NETWORK BLOCKED: Your internet or VPN is blocking the connection to Supabase. Please turn off VPN/Ad-blocker and refresh.';
   }
-  return error.message || JSON.stringify(error);
+
+  if (message.includes('column profiles.created_at does not exist')) {
+    return 'DB_MISSING_CREATED_AT';
+  }
+
+  if (message.includes('email') && (message.includes('does not exist') || message.includes('profiles_1'))) {
+    return 'DB_MISSING_EMAIL';
+  }
+
+  if (message.includes('column profiles.avatar_url does not exist')) {
+    return 'DB_MISSING_AVATAR';
+  }
+
+  return message;
 };
 
 export const getUserProfile = async (userId: string) => {
@@ -56,12 +73,23 @@ export const submitWithdrawRequest = async (userId: string, amount: number, meth
 };
 
 export const getPendingWithdrawals = async () => {
-  return await supabase
+  // First attempt with full profile info
+  const res = await supabase
     .from('transactions')
     .select('*, profiles(first_name, last_name, email, balance)')
     .eq('status', 'pending')
     .eq('type', 'withdraw')
     .order('created_at', { ascending: false });
+  
+  // If fails due to missing email, fallback to basic query
+  if (res.error && (res.error.message.includes('email') || res.error.message.includes('profiles_1'))) {
+    return await supabase
+      .from('transactions')
+      .select('*, profiles(first_name, last_name, balance)')
+      .eq('status', 'pending')
+      .eq('type', 'withdraw');
+  }
+  return res;
 };
 
 export const updateWithdrawStatus = async (transactionId: string, status: 'approved' | 'rejected', userId: string, amount: number) => {
@@ -116,12 +144,21 @@ export const submitDepositRequest = async (depositData: {
 };
 
 export const getPendingTransactions = async () => {
-  return await supabase
+  const res = await supabase
     .from('transactions')
     .select('*, profiles(first_name, last_name, email, balance)')
     .eq('status', 'pending')
     .eq('type', 'deposit')
     .order('created_at', { ascending: false });
+
+  if (res.error && (res.error.message.includes('email') || res.error.message.includes('profiles_1'))) {
+    return await supabase
+      .from('transactions')
+      .select('*, profiles(first_name, last_name, balance)')
+      .eq('status', 'pending')
+      .eq('type', 'deposit');
+  }
+  return res;
 };
 
 export const updateTransactionStatus = async (transactionId: string, status: 'approved' | 'rejected', userId: string, amount: number) => {
@@ -166,8 +203,14 @@ export const updateGlobalSettings = async (updates: any) => {
 };
 
 export const getAllUsers = async () => {
-  const { data, error } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
-  return { data, error };
+  // First attempt with order
+  const res = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
+  
+  // If order fails (missing created_at), fallback to no order
+  if (res.error && res.error.message.includes('created_at')) {
+    return await supabase.from('profiles').select('*');
+  }
+  return res;
 };
 
 export const adminUpdateUser = async (userId: string, updates: any) => {
