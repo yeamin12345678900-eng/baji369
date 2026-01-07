@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { supabase, getAllUsers, adminUpdateUser, updateGlobalSettings, getPlatformActivity, broadcastNotification, getPendingTransactions, updateTransactionStatus } from '../services/supabase';
+import { supabase, getAllUsers, adminUpdateUser, updateGlobalSettings, getPlatformActivity, broadcastNotification, getPendingTransactions, updateTransactionStatus, getPendingWithdrawals, updateWithdrawStatus } from '../services/supabase';
 
 interface AdminPanelProps {
   onBack: () => void;
@@ -14,9 +14,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
   const [users, setUsers] = useState<any[]>([]);
   const [activity, setActivity] = useState<any[]>([]);
   const [pendingDeposits, setPendingDeposits] = useState<any[]>([]);
+  const [pendingWithdraws, setPendingWithdraws] = useState<any[]>([]);
   const [stats, setStats] = useState({ totalStakes: 0, totalPayouts: 0, netProfit: 0, totalBets: 0, activeUsers: 0 });
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'rigging' | 'games' | 'users' | 'activity' | 'broadcast' | 'reports' | 'deposits'>('reports');
+  const [activeTab, setActiveTab] = useState<'rigging' | 'games' | 'users' | 'activity' | 'broadcast' | 'reports' | 'deposits' | 'withdrawals'>('reports');
   const [searchQuery, setSearchQuery] = useState('');
   
   const [notifTitle, setNotifTitle] = useState('');
@@ -39,6 +40,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
       const { data: deposits } = await getPendingTransactions();
       if (deposits) setPendingDeposits(deposits);
 
+      const { data: withdraws } = await getPendingWithdrawals();
+      if (withdraws) setPendingWithdraws(withdraws);
+
       const { data: bets } = await supabase.from('bets').select('*');
       if (bets) {
         const totalStakes = bets.reduce((sum, b) => sum + Number(b.stake), 0);
@@ -59,9 +63,18 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
   const handleDepositAction = async (id: string, status: 'approved' | 'rejected', userId: string, amount: number) => {
     try {
       await updateTransactionStatus(id, status, userId, amount);
-      fetchData(); // Refresh data
+      fetchData();
     } catch (err) {
       alert("Failed to update deposit.");
+    }
+  };
+
+  const handleWithdrawAction = async (id: string, status: 'approved' | 'rejected', userId: string, amount: number) => {
+    try {
+      await updateWithdrawStatus(id, status, userId, amount);
+      fetchData();
+    } catch (err) {
+      alert("Failed to update withdrawal.");
     }
   };
 
@@ -114,17 +127,47 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
 
       <div className="flex-1 overflow-y-auto no-scrollbar p-6 space-y-6 pb-32">
         <div className="flex bg-white/5 p-1 rounded-2xl border border-white/10 overflow-x-auto no-scrollbar gap-1">
-           {['reports', 'deposits', 'rigging', 'broadcast', 'activity', 'users', 'games'].map((t) => (
+           {['reports', 'deposits', 'withdrawals', 'rigging', 'broadcast', 'activity', 'users', 'games'].map((t) => (
              <button key={t} onClick={() => setActiveTab(t as any)} className={`shrink-0 px-5 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${activeTab === t ? 'bg-primary text-white shadow-lg' : 'text-slate-500'}`}>{t}</button>
            ))}
         </div>
 
+        {/* WITHDRAWAL REQUESTS TAB */}
+        {activeTab === 'withdrawals' && (
+          <div className="space-y-4 animate-in slide-in-from-bottom">
+            <h3 className="text-white font-black text-sm uppercase px-2">Withdrawals ({pendingWithdraws.length})</h3>
+            {pendingWithdraws.length > 0 ? pendingWithdraws.map(wd => (
+              <div key={wd.id} className="bg-[#1a0d0e] border border-white/5 rounded-[2.5rem] p-6 space-y-5 shadow-2xl">
+                 <div className="flex justify-between items-start">
+                    <div>
+                       <p className="text-primary font-black text-base italic uppercase tracking-tighter">{wd.method} - ${wd.amount}</p>
+                       <p className="text-white text-lg font-black tracking-widest mt-1">{wd.phone_number}</p>
+                    </div>
+                    <div className="text-right">
+                       <p className="text-slate-400 text-[9px] font-black uppercase">{wd.profiles?.email}</p>
+                       <p className="text-slate-600 text-[7px] uppercase mt-1">{new Date(wd.created_at).toLocaleString()}</p>
+                    </div>
+                 </div>
+                 <div className="flex gap-2">
+                    <button onClick={() => handleWithdrawAction(wd.id, 'approved', wd.user_id, wd.amount)} className="flex-1 h-14 bg-emerald-500 text-white rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-emerald-900/20 active:scale-95 transition-all">Mark as Paid</button>
+                    <button onClick={() => handleWithdrawAction(wd.id, 'rejected', wd.user_id, wd.amount)} className="flex-1 h-14 bg-red-500/10 border border-red-500/20 text-red-500 rounded-2xl font-black text-[10px] uppercase active:scale-95 transition-all">Reject (Refund)</button>
+                 </div>
+              </div>
+            )) : (
+              <div className="py-20 text-center opacity-20">
+                 <span className="material-symbols-outlined text-5xl">payments</span>
+                 <p className="text-xs font-black uppercase mt-2">No pending withdrawals</p>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* DEPOSIT REQUESTS TAB */}
         {activeTab === 'deposits' && (
           <div className="space-y-4 animate-in slide-in-from-bottom">
-            <h3 className="text-white font-black text-sm uppercase px-2">Manual Verification ({pendingDeposits.length})</h3>
+            <h3 className="text-white font-black text-sm uppercase px-2">Deposits ({pendingDeposits.length})</h3>
             {pendingDeposits.length > 0 ? pendingDeposits.map(dep => (
-              <div key={dep.id} className="bg-white/5 border border-white/10 rounded-[2rem] p-6 space-y-4 shadow-xl">
+              <div key={dep.id} className="bg-[#1a0d0e] border border-white/5 rounded-[2.5rem] p-6 space-y-4 shadow-xl">
                  <div className="flex justify-between items-start">
                     <div>
                        <p className="text-white font-black text-sm uppercase italic">{dep.method} - ৳{dep.amount}</p>
@@ -143,7 +186,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
             )) : (
               <div className="py-20 text-center opacity-20">
                  <span className="material-symbols-outlined text-5xl">receipt_long</span>
-                 <p className="text-xs font-black uppercase mt-2">No pending requests</p>
+                 <p className="text-xs font-black uppercase mt-2">No pending deposits</p>
               </div>
             )}
           </div>

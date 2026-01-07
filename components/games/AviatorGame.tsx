@@ -52,24 +52,36 @@ const AviatorGame: React.FC<AviatorGameProps> = ({ balance, onUpdateBalance, onS
     if (gameState === 'running') return;
     if (balance < bet) return;
     onUpdateBalance(balance - bet);
+    
     const random = Math.random();
     let target = 1.00;
-    const instantCrashThreshold = riggingIntensity * 0.70; 
-    if (random < instantCrashThreshold) {
-      target = 1.00 + (Math.random() * 0.12);
+    
+    // Improved Rigging: 
+    // High intensity = higher chance of instant crash or low multi
+    const instantCrashChance = riggingIntensity * 0.4; // max 40% chance of instant crash
+    
+    if (random < instantCrashChance) {
+      target = 1.00 + (Math.random() * 0.08); // Crashes between 1.00 and 1.08
     } else {
-      const houseEdge = 0.05 + (riggingIntensity * 0.40); 
+      // Normal game but house edge scales with riggingIntensity
+      const houseEdge = 0.03 + (riggingIntensity * 0.25); // House edge 3% to 28%
       const rawTarget = (1.0 - houseEdge) / (1.0 - Math.random());
       target = parseFloat(Math.max(1.01, rawTarget).toFixed(2));
+      
+      // Safety cap: High rigging prevents high multipliers
+      if (riggingIntensity > 0.7 && target > 5.0) target = 1.5 + (Math.random() * 2);
     }
+
     setMultiplier(1.0);
     multiplierRef.current = 1.0;
     setGameState('running');
     playSound('engine');
+    
     timerRef.current = setInterval(() => {
       const growthFactor = 0.005 + (multiplierRef.current * 0.008);
       multiplierRef.current += growthFactor;
       const current = parseFloat(multiplierRef.current.toFixed(2));
+      
       if (current >= target) {
         clearInterval(timerRef.current);
         setGameState('fly-away');

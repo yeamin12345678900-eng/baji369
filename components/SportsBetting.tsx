@@ -33,7 +33,7 @@ interface SportsBettingProps {
   balance: number;
   onNotificationClick?: () => void;
   onMyBetsClick?: () => void;
-  globalRigging?: number; // Added to support admin control
+  globalRigging?: number; 
 }
 
 const SportsBetting: React.FC<SportsBettingProps> = ({ lang, balance, onNotificationClick, onMyBetsClick, globalRigging = 0.3 }) => {
@@ -52,7 +52,6 @@ const SportsBetting: React.FC<SportsBettingProps> = ({ lang, balance, onNotifica
     { id: 'Basketball', icon: 'sports_basketball', count: 21, label: lang === 'en' ? 'Basketball' : 'বাস্কেটবল' }
   ];
 
-  // Logic to ensure house edge is respected based on globalRigging
   useEffect(() => {
     const interval = setInterval(() => {
       setMatches(currentMatches => {
@@ -60,8 +59,7 @@ const SportsBetting: React.FC<SportsBettingProps> = ({ lang, balance, onNotifica
           if (Math.random() > 0.7) {
             const newOdds = match.odds.map(odd => {
               if (odd === 0) return 0;
-              // Higher global rigging = lower odds for users (higher profit for admin)
-              const bias = globalRigging * 0.2; 
+              const bias = globalRigging * 0.25; 
               const change = (Math.random() - (0.5 + bias)) * 0.15; 
               const updated = parseFloat((odd + change).toFixed(2));
               return Math.max(1.05, updated);
@@ -77,8 +75,10 @@ const SportsBetting: React.FC<SportsBettingProps> = ({ lang, balance, onNotifica
 
   const handlePlaceBet = () => {
     setIsPlacing(true);
-    // Rigging Logic: Higher rigging means higher chance of simulated loss
-    const winThreshold = 0.85 - (globalRigging * 0.6); // If rigging is 1.0, win chance is 25%
+    
+    // Rigging Logic: Higher globalRigging = Lower chance to win simulated bets
+    // winThreshold: 0.15 (at 0 rigging) to 0.85 (at 1.0 rigging)
+    const winThreshold = 0.15 + (globalRigging * 0.7); 
     const isWin = Math.random() > winThreshold;
 
     setTimeout(() => {
@@ -88,7 +88,7 @@ const SportsBetting: React.FC<SportsBettingProps> = ({ lang, balance, onNotifica
       if (isWin) {
         alert(lang === 'en' ? "Bet placed successfully!" : "বেট সফলভাবে প্লেস করা হয়েছে!");
       } else {
-        alert(lang === 'en' ? "Error processing bet. Internal settlement error." : "বেট প্রসেসিং ত্রুটি। অভ্যন্তরীণ সেটেলমেন্ট সমস্যা।");
+        alert(lang === 'en' ? "Your selection was rejected due to risk management." : "রিস্ক ম্যানেজমেন্টের কারণে আপনার বেটটি বাতিল করা হয়েছে।");
       }
     }, 1500);
   };
