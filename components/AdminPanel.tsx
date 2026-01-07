@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { supabase, getAllUsers, adminUpdateUser, updateGlobalSettings, getPlatformActivity, broadcastNotification, getPendingTransactions, updateTransactionStatus, getPendingWithdrawals, updateWithdrawStatus, getGlobalSettings } from '../services/supabase';
+import { supabase, getAllUsers, adminUpdateUser, updateGlobalSettings, getPlatformActivity, broadcastNotification, getPendingTransactions, updateTransactionStatus, getPendingWithdrawals, updateWithdrawStatus, getGlobalSettings, formatError } from '../services/supabase';
 
 interface AdminPanelProps {
   onBack: () => void;
@@ -44,50 +44,59 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      // 1. Fetch Users
-      const { data: userData } = await getAllUsers();
-      if (userData) {
-        setUsers(userData);
-        setStats(prev => ({ ...prev, activeUsers: userData.length }));
+      // Use individual try-catches so one table failure doesn't block others
+      
+      // 1. Users
+      const { data: uData, error: uErr } = await getAllUsers();
+      if (uErr) console.error("User Fetch Error:", formatError(uErr));
+      else if (uData) {
+        setUsers(uData);
+        setStats(prev => ({ ...prev, activeUsers: uData.length }));
       }
 
-      // 2. Fetch Pending Deposits
-      const { data: deposits, error: depError } = await getPendingTransactions();
-      if (depError) {
-        console.error("Deposit Fetch Error:", depError);
-      } else if (deposits) {
-        setPendingDeposits(deposits);
+      // 2. Deposits
+      const { data: dData, error: dErr } = await getPendingTransactions();
+      if (dErr) {
+        const msg = formatError(dErr);
+        console.error("Deposit Fetch Error:", msg);
+        if (activeTab === 'deposits') alert(`Deposit Error: ${msg}\n\nDiagnosis: Check if table "transactions" exists and VPN is off.`);
+      } else if (dData) {
+        setPendingDeposits(dData);
       }
 
-      // 3. Fetch Pending Withdrawals
-      const { data: withdraws, error: withError } = await getPendingWithdrawals();
-      if (withError) {
-        console.error("Withdraw Fetch Error:", withError);
-      } else if (withdraws) {
-        setPendingWithdraws(withdraws);
+      // 3. Withdrawals
+      const { data: wData, error: wErr } = await getPendingWithdrawals();
+      if (wErr) {
+        const msg = formatError(wErr);
+        console.error("Withdraw Fetch Error:", msg);
+        if (activeTab === 'withdrawals') alert(`Withdraw Error: ${msg}\n\nDiagnosis: Check if table "transactions" exists and VPN is off.`);
+      } else if (wData) {
+        setPendingWithdraws(wData);
       }
 
-      // 4. Global Settings
-      const { data: globalSets } = await getGlobalSettings();
-      if (globalSets) {
-        if (globalSets.payment_numbers) setPaymentNumbers(globalSets.payment_numbers);
-        if (globalSets.method_status) setMethodStatus(globalSets.method_status);
+      // 4. Settings
+      const { data: sData, error: sErr } = await getGlobalSettings();
+      if (sErr) console.error("Settings Fetch Error:", formatError(sErr));
+      else if (sData) {
+        if (sData.payment_numbers) setPaymentNumbers(sData.payment_numbers);
+        if (sData.method_status) setMethodStatus(sData.method_status);
       }
 
-      // 5. Stats from Bets
-      const { data: bets } = await supabase.from('bets').select('*');
-      if (bets) {
-        const totalStakes = bets.reduce((sum, b) => sum + Number(b.stake), 0);
-        const totalPayouts = bets.reduce((sum, b) => sum + Number(b.payout), 0);
-        setStats(prev => ({ ...prev, totalStakes, totalPayouts, netProfit: totalStakes - totalPayouts, totalBets: bets.length }));
+      // 5. Bets / Stats
+      const { data: bData, error: bErr } = await supabase.from('bets').select('*');
+      if (bErr) console.error("Bets Fetch Error:", formatError(bErr));
+      else if (bData) {
+        const totalStakes = bData.reduce((sum, b) => sum + Number(b.stake), 0);
+        const totalPayouts = bData.reduce((sum, b) => sum + Number(b.payout), 0);
+        setStats(prev => ({ ...prev, totalStakes, totalPayouts, netProfit: totalStakes - totalPayouts, totalBets: bData.length }));
       }
 
-      // 6. Activity Logs
-      const { data: activityLogs } = await getPlatformActivity();
-      if (activityLogs) setActivity(activityLogs);
+      // 6. Activity
+      const { data: aData } = await getPlatformActivity();
+      if (aData) setActivity(aData);
 
-    } catch (err) {
-      console.error("General Admin Data Fetch Error:", err);
+    } catch (err: any) {
+      console.error("Global Fetch Error:", formatError(err));
     } finally {
       setIsLoading(false);
     }
@@ -105,15 +114,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
       const { error } = await updateGlobalSettings(payload);
       
       if (error) {
-        // Fix for [object Object] error
-        const errorMessage = (error as any).message || JSON.stringify(error);
-        alert(`SAVE FAILED:\n${errorMessage}\n\nMake sure the "settings" table exists in your SQL Editor.`);
+        const msg = formatError(error);
+        alert(`SAVE FAILED:\n${msg}\n\nACTION: Run the SQL Editor script provided in previous steps to create the "settings" table.`);
         return;
       }
       
       alert("SUCCESS: Payment settings updated!");
     } catch (err: any) {
-      alert(`SYSTEM ERROR: ${err.message || "Unknown Error"}`);
+      alert(`SYSTEM ERROR: ${formatError(err)}`);
     } finally {
       setIsSavingPayments(false);
     }
@@ -121,23 +129,21 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
 
   const handleDepositAction = async (id: string, status: 'approved' | 'rejected', userId: string, amount: number) => {
     try {
-      // Fix: updateTransactionStatus returns { success: true } and throws on error
       await updateTransactionStatus(id, status, userId, amount);
       alert(`Deposit ${status === 'approved' ? 'Approved' : 'Rejected'}!`);
       fetchData();
     } catch (err: any) {
-      alert("Error updating deposit: " + (err.message || "Failed"));
+      alert("Error updating deposit: " + formatError(err));
     }
   };
 
   const handleWithdrawAction = async (id: string, status: 'approved' | 'rejected', userId: string, amount: number) => {
     try {
-      // Fix: updateWithdrawStatus returns { success: true } and throws on error
       await updateWithdrawStatus(id, status, userId, amount);
       alert(`Withdrawal ${status === 'approved' ? 'Approved' : 'Rejected'}!`);
       fetchData();
     } catch (err: any) {
-      alert("Error updating withdrawal: " + (err.message || "Failed"));
+      alert("Error updating withdrawal: " + formatError(err));
     }
   };
 
@@ -149,8 +155,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
       alert("Broadcast successful!");
       setNotifTitle('');
       setNotifMsg('');
-    } catch (err) {
-      alert("Failed to broadcast.");
+    } catch (err: any) {
+      alert("Failed to broadcast: " + formatError(err));
     } finally {
       setIsBroadcasting(false);
     }

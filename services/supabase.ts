@@ -1,11 +1,20 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-// Fallback to static strings if env is not populated correctly in some environments
-const SUPABASE_URL = (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_URL) || 'https://anwivgcqxakbyajfueth.supabase.co';
-const SUPABASE_ANON_KEY = (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_ANON_KEY) || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFud2l2Z2NxeGFrYnlhamZ1ZXRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjczMzgxNDAsImV4cCI6MjA4MjkxNDE0MH0.BS_S6f9330G0wcx9X67ZbySxkIKuGBz5gh0tk13Z4eE';
+// Use type assertion to avoid TypeScript error on Vite's import.meta.env
+const SUPABASE_URL = ((import.meta as any).env?.VITE_SUPABASE_URL) || 'https://anwivgcqxakbyajfueth.supabase.co';
+const SUPABASE_ANON_KEY = ((import.meta as any).env?.VITE_SUPABASE_ANON_KEY) || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFud2l2Z2NxeGFrYnlhamZ1ZXRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjczMzgxNDAsImV4cCI6MjA4MjkxNDE0MH0.BS_S6f9330G0wcx9X67ZbySxkIKuGBz5gh0tk13Z4eE';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// Helper to format Supabase errors into readable strings
+export const formatError = (error: any): string => {
+  if (!error) return 'Unknown Error';
+  if (error.message === 'Failed to fetch') {
+    return 'NETWORK ERROR: Connection to Supabase was blocked. Please turn off VPN, Ad-blocker, and ensure your internet is stable.';
+  }
+  return error.message || JSON.stringify(error);
+};
 
 export const getUserProfile = async (userId: string) => {
   try {
@@ -149,7 +158,6 @@ export const getGlobalSettings = async () => {
 };
 
 export const updateGlobalSettings = async (updates: any) => {
-  // Use upsert to ensure row 1 exists or is updated
   const { data, error } = await supabase
     .from('settings')
     .upsert({ id: 1, ...updates, updated_at: new Date().toISOString() })
