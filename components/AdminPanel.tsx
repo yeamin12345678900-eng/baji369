@@ -82,16 +82,25 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
   const handleSavePayments = async () => {
     setIsSavingPayments(true);
     try {
-      // Send both payment_numbers and method_status to be sure they stay in sync
-      const { error } = await updateGlobalSettings({ 
+      // Ensuring we use the correct structure for upsert
+      const payload = { 
+        id: 1, 
         payment_numbers: paymentNumbers,
         method_status: methodStatus 
-      });
-      if (error) throw error;
-      alert("SUCCESS: Database updated successfully!");
+      };
+
+      const { error } = await updateGlobalSettings(payload);
+      
+      if (error) {
+        // Fix for [object Object]: Convert the error object to a readable string message
+        const errorMessage = (error as any).message || JSON.stringify(error);
+        alert(`SAVE FAILED:\n${errorMessage}\n\nTips: Please ensure the "settings" table exists in your Supabase SQL Editor.`);
+        return;
+      }
+      
+      alert("SUCCESS: Payment settings updated!");
     } catch (err: any) {
-      console.error("Save error:", err);
-      alert(`ERROR: Could not save. Make sure you ran the SQL script in Supabase! \n\nDetails: ${err.message}`);
+      alert(`SYSTEM ERROR: ${err.message || "Unknown Error"}`);
     } finally {
       setIsSavingPayments(false);
     }
@@ -133,13 +142,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
   const handleRiggingChange = async (game: string, value: number) => {
     const newSettings = { ...settings, [game]: value };
     onUpdateSettings(newSettings);
-    await updateGlobalSettings({ rigging: newSettings });
+    await updateGlobalSettings({ id: 1, rigging: newSettings });
   };
 
   const toggleGame = async (gameId: string) => {
     const newStatus = { ...gameStatus, [gameId]: !gameStatus[gameId] };
     onUpdateGameStatus(newStatus);
-    await updateGlobalSettings({ game_status: newStatus });
+    await updateGlobalSettings({ id: 1, game_status: newStatus });
   };
 
   const handleUpdateBalance = async (userId: string, currentBalance: number) => {
@@ -224,7 +233,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
           </div>
         )}
 
-        {/* REST OF THE TABS */}
         {activeTab === 'withdrawals' && (
           <div className="space-y-4 animate-in slide-in-from-bottom">
             <h3 className="text-white font-black text-sm uppercase px-2">Withdrawals ({pendingWithdraws.length})</h3>
