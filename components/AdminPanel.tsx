@@ -39,29 +39,42 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [activeTab]);
 
   const fetchData = async () => {
     setIsLoading(true);
     try {
+      // 1. Fetch Users
       const { data: userData } = await getAllUsers();
       if (userData) {
         setUsers(userData);
         setStats(prev => ({ ...prev, activeUsers: userData.length }));
       }
 
-      const { data: deposits } = await getPendingTransactions();
-      if (deposits) setPendingDeposits(deposits);
+      // 2. Fetch Pending Deposits
+      const { data: deposits, error: depError } = await getPendingTransactions();
+      if (depError) {
+        console.error("Deposit Fetch Error:", depError);
+      } else if (deposits) {
+        setPendingDeposits(deposits);
+      }
 
-      const { data: withdraws } = await getPendingWithdrawals();
-      if (withdraws) setPendingWithdraws(withdraws);
+      // 3. Fetch Pending Withdrawals
+      const { data: withdraws, error: withError } = await getPendingWithdrawals();
+      if (withError) {
+        console.error("Withdraw Fetch Error:", withError);
+      } else if (withdraws) {
+        setPendingWithdraws(withdraws);
+      }
 
+      // 4. Global Settings
       const { data: globalSets } = await getGlobalSettings();
       if (globalSets) {
         if (globalSets.payment_numbers) setPaymentNumbers(globalSets.payment_numbers);
         if (globalSets.method_status) setMethodStatus(globalSets.method_status);
       }
 
+      // 5. Stats from Bets
       const { data: bets } = await supabase.from('bets').select('*');
       if (bets) {
         const totalStakes = bets.reduce((sum, b) => sum + Number(b.stake), 0);
@@ -69,11 +82,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
         setStats(prev => ({ ...prev, totalStakes, totalPayouts, netProfit: totalStakes - totalPayouts, totalBets: bets.length }));
       }
 
+      // 6. Activity Logs
       const { data: activityLogs } = await getPlatformActivity();
       if (activityLogs) setActivity(activityLogs);
 
     } catch (err) {
-      console.error("Admin fetch error", err);
+      console.error("General Admin Data Fetch Error:", err);
     } finally {
       setIsLoading(false);
     }
@@ -82,7 +96,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
   const handleSavePayments = async () => {
     setIsSavingPayments(true);
     try {
-      // Ensuring we use the correct structure for upsert
       const payload = { 
         id: 1, 
         payment_numbers: paymentNumbers,
@@ -92,9 +105,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
       const { error } = await updateGlobalSettings(payload);
       
       if (error) {
-        // Fix for [object Object]: Convert the error object to a readable string message
+        // Fix for [object Object] error
         const errorMessage = (error as any).message || JSON.stringify(error);
-        alert(`SAVE FAILED:\n${errorMessage}\n\nTips: Please ensure the "settings" table exists in your Supabase SQL Editor.`);
+        alert(`SAVE FAILED:\n${errorMessage}\n\nMake sure the "settings" table exists in your SQL Editor.`);
         return;
       }
       
@@ -108,19 +121,23 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
 
   const handleDepositAction = async (id: string, status: 'approved' | 'rejected', userId: string, amount: number) => {
     try {
+      // Fix: updateTransactionStatus returns { success: true } and throws on error
       await updateTransactionStatus(id, status, userId, amount);
+      alert(`Deposit ${status === 'approved' ? 'Approved' : 'Rejected'}!`);
       fetchData();
-    } catch (err) {
-      alert("Failed to update deposit.");
+    } catch (err: any) {
+      alert("Error updating deposit: " + (err.message || "Failed"));
     }
   };
 
   const handleWithdrawAction = async (id: string, status: 'approved' | 'rejected', userId: string, amount: number) => {
     try {
+      // Fix: updateWithdrawStatus returns { success: true } and throws on error
       await updateWithdrawStatus(id, status, userId, amount);
+      alert(`Withdrawal ${status === 'approved' ? 'Approved' : 'Rejected'}!`);
       fetchData();
-    } catch (err) {
-      alert("Failed to update withdrawal.");
+    } catch (err: any) {
+      alert("Error updating withdrawal: " + (err.message || "Failed"));
     }
   };
 
@@ -142,13 +159,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
   const handleRiggingChange = async (game: string, value: number) => {
     const newSettings = { ...settings, [game]: value };
     onUpdateSettings(newSettings);
-    await updateGlobalSettings({ id: 1, rigging: newSettings });
+    await updateGlobalSettings({ rigging: newSettings });
   };
 
   const toggleGame = async (gameId: string) => {
     const newStatus = { ...gameStatus, [gameId]: !gameStatus[gameId] };
     onUpdateGameStatus(newStatus);
-    await updateGlobalSettings({ id: 1, game_status: newStatus });
+    await updateGlobalSettings({ game_status: newStatus });
   };
 
   const handleUpdateBalance = async (userId: string, currentBalance: number) => {
