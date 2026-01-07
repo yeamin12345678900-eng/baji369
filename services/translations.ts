@@ -56,7 +56,20 @@ export const translations = {
     terms: "Terms & Conditions",
     privacy: "Privacy Policy",
     downloadApp: "Download App",
-    installMobile: "Install Mobile App"
+    installMobile: "Install Mobile App",
+    // Payment specific
+    localPayment: "Local Payment",
+    globalPayment: "Global Payment",
+    secureGateway: "Secure Gateway",
+    payWith: "Pay with RupantorPay",
+    selectProvider: "Select Provider",
+    trxId: "Transaction ID",
+    enterTrxId: "Enter Transaction ID",
+    submitRequest: "Submit Request",
+    merchantNo: "Merchant Number",
+    copy: "Copy",
+    copied: "Copied!",
+    paymentInstruction: "Please send money to the number below and enter the Transaction ID."
   },
   bn: {
     home: "হোম",
@@ -114,7 +127,20 @@ export const translations = {
     terms: "শর্তাবলী",
     privacy: "প্রাইভেসি পলিসি",
     downloadApp: "অ্যাপ ডাউনলোড",
-    installMobile: "মোবাইল অ্যাপ ইন্সটল"
+    installMobile: "মোবাইল অ্যাপ ইন্সটল",
+    // Payment specific
+    localPayment: "লোকাল পেমেন্ট",
+    globalPayment: "গ্লোবাল পেমেন্ট",
+    secureGateway: "নিরাপদ গেটওয়ে",
+    payWith: "RupantorPay দিয়ে পেমেন্ট করুন",
+    selectProvider: "প্রোভাইডার সিলেক্ট করুন",
+    trxId: "ট্রানজেকশন আইডি",
+    enterTrxId: "ট্রানজেকশন আইডি লিখুন",
+    submitRequest: "ডিপোজিট রিকোয়েস্ট পাঠান",
+    merchantNo: "মার্চেন্ট নাম্বার",
+    copy: "কপি",
+    copied: "কপি হয়েছে!",
+    paymentInstruction: "নিচের নাম্বারে টাকা পাঠিয়ে ট্রানজেকশন আইডি (TrxID) ইনপুট দিন।"
   }
 };
 

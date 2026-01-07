@@ -1,13 +1,7 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Language, translations } from '../services/translations';
-import { supabase } from '../services/supabase';
-
-declare global {
-  interface Window {
-    Paddle: any;
-  }
-}
+import { supabase, submitDepositRequest } from '../services/supabase';
 
 interface DepositProps {
   lang: Language;
@@ -16,184 +10,234 @@ interface DepositProps {
   onDepositSuccess: (amount: number) => void;
 }
 
+type Provider = 'bkash' | 'nagad' | 'rocket';
+
 const Deposit: React.FC<DepositProps> = ({ lang, balance, onBack, onDepositSuccess }) => {
-  const [isProcessing, setIsProcessing] = useState(false);
+  const t = translations[lang];
+  const [view, setView] = useState<'selection' | 'paddle' | 'rupantor-steps'>('selection');
+  const [step, setStep] = useState<1 | 2>(1); 
+  const [provider, setProvider] = useState<Provider>('bkash');
+  const [amount, setAmount] = useState<number>(500);
+  const [trxId, setTrxId] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [user, setUser] = useState<any>(null);
-  const [paddleStatus, setPaddleStatus] = useState<'loading' | 'ready' | 'error'>('loading');
-  const initRef = useRef(false);
-  const successTriggered = useRef(false);
 
   useEffect(() => {
-    const fetchUser = async () => {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (authUser) setUser(authUser);
-    };
-    fetchUser();
-
-    const setupPaddle = () => {
-      if (typeof window.Paddle !== 'undefined' && !initRef.current) {
-        try {
-          // Keep it in sandbox for testing. Switch to 'live' only after Paddle approval.
-          window.Paddle.Environment.set('sandbox');
-          
-          window.Paddle.Initialize({ 
-            token: 'test_30377928de7016923db465cac6d', 
-            eventCallback: (event: any) => {
-              console.log("Paddle Global Event:", event.name);
-              
-              if (event.name === 'checkout.completed' && !successTriggered.current) {
-                console.log("Deposit Success Detected!");
-                successTriggered.current = true;
-                // amount is defined in the openCheckout scope, but we use a constant for this test
-                onDepositSuccess(50); 
-                setIsProcessing(false);
-              }
-            }
-          });
-          
-          initRef.current = true;
-          setPaddleStatus('ready');
-        } catch (e) {
-          console.error("Paddle Initialization Failed:", e);
-          setPaddleStatus('error');
-        }
-      }
-    };
-
-    const checkInterval = setInterval(() => {
-      if (window.Paddle) {
-        setupPaddle();
-        clearInterval(checkInterval);
-      }
-    }, 500);
-
-    return () => clearInterval(checkInterval);
+    supabase.auth.getUser().then(({ data }) => setUser(data.user));
   }, []);
 
-  const activePlan = { 
-    amount: 50, 
-    label: 'Pro Gamer Pack', 
-    priceId: 'pri_01ke6f0feh7aprvx2zzcd6yr6m' 
+  const handleCopy = () => {
+    // You can replace this number with your actual merchant/personal number
+    navigator.clipboard.writeText("01700000000"); 
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
-  const openCheckout = (priceId: string, amount: number) => {
-    if (paddleStatus !== 'ready') return;
-    if (!user) {
-      alert("Please login to proceed.");
-      return;
+  const handleSubmitTrx = async () => {
+    if (!trxId || !user) {
+        alert(lang === 'en' ? "Please enter Transaction ID" : "দয়া করে ট্রানজেকশন আইডি দিন");
+        return;
     }
-
-    setIsProcessing(true);
-    successTriggered.current = false; // Reset for new transaction
-
+    setIsSubmitting(true);
+    
     try {
-      window.Paddle.Checkout.open({
-        settings: {
-          displayMode: 'overlay',
-          theme: 'dark',
-          locale: 'en',
-          allowLogout: false,
-        },
-        items: [{ priceId: priceId, quantity: 1 }],
-        customer: { email: user.email },
-        customData: { userId: user.id, amount: amount.toString() }
+      const { error } = await submitDepositRequest({
+        user_id: user.id,
+        amount: amount,
+        method: provider.toUpperCase(),
+        transaction_id: trxId
       });
-    } catch (err) {
-      console.error("Paddle Open Error:", err);
-      setIsProcessing(false);
+
+      if (error) {
+          if (error.code === '23505') {
+              alert(lang === 'en' ? "This Transaction ID has already been used!" : "এই ট্রানজেকশন আইডিটি আগে ব্যবহার করা হয়েছে!");
+          } else {
+              throw error;
+          }
+          return;
+      }
+
+      alert(lang === 'en' ? "Deposit request submitted! Please wait for admin approval." : "ডিপোজিট রিকোয়েস্ট পাঠানো হয়েছে! অ্যাডমিনের অনুমোদনের জন্য অপেক্ষা করুন।");
+      onBack();
+    } catch (e: any) {
+      alert("Error: " + e.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
+
+  const providers = [
+    { id: 'bkash', name: 'bKash', color: 'bg-[#D12053]', icon: 'https://raw.githubusercontent.com/rupantor-pay/assets/main/bkash.png' },
+    { id: 'nagad', name: 'Nagad', color: 'bg-[#F16022]', icon: 'https://raw.githubusercontent.com/rupantor-pay/assets/main/nagad.png' },
+    { id: 'rocket', name: 'Rocket', color: 'bg-[#8C3494]', icon: 'https://raw.githubusercontent.com/rupantor-pay/assets/main/rocket.png' }
+  ];
 
   return (
-    <div className="flex flex-col h-full bg-[#0d0909] font-display">
+    <div className="flex flex-col h-full bg-[#0d0909] font-display animate-in fade-in duration-500">
       <header className="sticky top-0 z-50 bg-[#0d0909]/95 backdrop-blur-md px-6 py-5 flex items-center justify-between border-b border-white/5 shadow-xl">
-        <button onClick={onBack} className="size-11 rounded-2xl bg-white/5 flex items-center justify-center text-white active:scale-90 border border-white/5 transition-all">
+        <button onClick={view === 'selection' ? onBack : () => { setView('selection'); setStep(1); }} className="size-11 rounded-2xl bg-white/5 flex items-center justify-center text-white active:scale-90 border border-white/5 transition-all">
           <span className="material-symbols-outlined">arrow_back</span>
         </button>
         <div className="flex flex-col items-center">
-            <h2 className="text-white text-lg font-black tracking-tight uppercase italic">Deposit</h2>
-            <div className="flex items-center gap-1.5">
-               <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-               <p className="text-[7px] text-emerald-500 font-black uppercase tracking-[0.2em]">Secure Sandbox Active</p>
-            </div>
+            <h2 className="text-white text-lg font-black tracking-tight uppercase italic">{t.deposit}</h2>
+            <p className="text-[7px] text-emerald-500 font-black uppercase tracking-[0.2em]">Secure RupantorPay Gateway</p>
         </div>
         <div className="size-11"></div>
       </header>
 
-      <main className="flex-1 px-6 pt-12 pb-32 overflow-y-auto no-scrollbar flex flex-col items-center">
-        {/* Status Banner - Clear indication that everything is fine */}
-        <div className="w-full max-w-[340px] mb-8 bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-2xl flex items-center gap-4">
-           <div className="size-10 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-500">
-              <span className="material-symbols-outlined text-[20px]">shield_check</span>
-           </div>
-           <div>
-              <p className="text-white text-[10px] font-black uppercase tracking-tight">System Ready</p>
-              <p className="text-emerald-500/80 text-[8px] font-bold uppercase">Sandbox verification successful</p>
-           </div>
-        </div>
+      <main className="flex-1 px-6 pt-8 pb-32 overflow-y-auto no-scrollbar flex flex-col items-center">
+        
+        {view === 'selection' && (
+          <div className="w-full max-w-[400px] space-y-6 animate-in slide-in-from-bottom duration-500">
+             <div className="text-center mb-4">
+                <h3 className="text-white text-xl font-black uppercase tracking-tighter italic">Choose Payment Method</h3>
+                <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mt-1">Instant Credits with Local Providers</p>
+             </div>
 
-        <div className="text-center mb-10 w-full">
-           <h3 className="text-white text-2xl font-black italic tracking-tighter uppercase">Elite Credit Package</h3>
-           <p className="text-slate-500 text-[9px] font-bold uppercase tracking-[0.3em] mt-2 italic">Official Baji369 Test Gateway</p>
-        </div>
-
-        <div className="w-full max-w-[340px]">
-           <div className="bg-gradient-to-b from-[#1a1313] to-black border border-primary shadow-2xl shadow-primary/10 rounded-[3rem] p-8 transition-all group relative overflow-hidden text-center">
-              <div className="absolute -top-10 -right-10 size-32 bg-primary/5 rounded-full blur-3xl"></div>
-              
-              <div className="relative z-10 mb-8">
-                <div className="size-16 rounded-3xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto mb-4">
-                  <span className="material-symbols-outlined text-primary text-4xl filled">workspace_premium</span>
+             <button 
+              onClick={() => setView('rupantor-steps')}
+              className="w-full bg-[#1a0d0e] border border-white/10 rounded-[2.5rem] p-6 flex items-center gap-6 group hover:border-primary/50 transition-all text-left shadow-2xl"
+             >
+                <div className="size-16 rounded-3xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
+                   <span className="material-symbols-outlined text-4xl">payments</span>
                 </div>
-                <h4 className="text-white font-black text-2xl uppercase tracking-tighter">{activePlan.label}</h4>
-              </div>
+                <div className="flex-1">
+                   <h4 className="text-white font-black text-lg uppercase italic tracking-tight">{t.localPayment}</h4>
+                   <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mt-1">bKash, Nagad, Rocket</p>
+                </div>
+                <span className="material-symbols-outlined text-slate-700">arrow_forward_ios</span>
+             </button>
 
-              <div className="relative z-10 mb-8">
-                 <p className="text-white text-5xl font-black italic tracking-tighter">${activePlan.amount}</p>
-                 <p className="text-slate-600 text-[9px] font-bold uppercase tracking-[0.2em] mt-2">Instant Account Credit</p>
-              </div>
+             <button 
+              onClick={() => setView('paddle')}
+              className="w-full bg-[#1a0d0e] border border-white/10 rounded-[2.5rem] p-6 flex items-center gap-6 group hover:border-blue-500/50 transition-all text-left shadow-2xl"
+             >
+                <div className="size-16 rounded-3xl bg-blue-500/10 flex items-center justify-center text-blue-500 border border-blue-500/20">
+                   <span className="material-symbols-outlined text-4xl">public</span>
+                </div>
+                <div className="flex-1">
+                   <h4 className="text-white font-black text-lg uppercase italic tracking-tight">{t.globalPayment}</h4>
+                   <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mt-1">Visa, Mastercard, Crypto</p>
+                </div>
+                <span className="material-symbols-outlined text-slate-700">arrow_forward_ios</span>
+             </button>
+          </div>
+        )}
 
-              <button 
-                onClick={() => openCheckout(activePlan.priceId, activePlan.amount)}
-                disabled={isProcessing || paddleStatus !== 'ready'}
-                className="w-full h-16 rounded-2xl font-black uppercase tracking-[0.2em] text-[11px] transition-all active:scale-95 flex items-center justify-center gap-3 bg-primary text-white shadow-xl shadow-primary/20"
-              >
-                {isProcessing ? (
-                  <div className="size-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                ) : (
-                  <>
-                    <span className="material-symbols-outlined text-[18px]">payments</span>
-                    <span>Deposit Now (Sandbox)</span>
-                  </>
-                )}
-              </button>
-           </div>
-        </div>
+        {view === 'rupantor-steps' && (
+          <div className="w-full max-w-[400px] animate-in slide-in-from-right duration-500">
+             {step === 1 ? (
+               <div className="space-y-8">
+                  <div className="bg-[#1a0d0e] border border-white/5 rounded-[3rem] p-8 space-y-8 shadow-2xl">
+                     <h3 className="text-white font-black text-center text-sm uppercase italic tracking-widest">{t.selectProvider}</h3>
+                     <div className="grid grid-cols-3 gap-3">
+                        {providers.map(p => (
+                          <button 
+                            key={p.id}
+                            onClick={() => setProvider(p.id as Provider)}
+                            className={`flex flex-col items-center justify-center p-5 rounded-2xl border transition-all ${provider === p.id ? 'bg-primary/10 border-primary scale-105' : 'bg-white/5 border-transparent opacity-40'}`}
+                          >
+                            <span className="text-[12px] font-black text-white uppercase mb-2">{p.name}</span>
+                            <div className="size-4 rounded-full border-2 border-white/20 flex items-center justify-center">
+                               {provider === p.id && <div className="size-2 bg-primary rounded-full"></div>}
+                            </div>
+                          </button>
+                        ))}
+                     </div>
 
-        {/* Reassurance Info for the developer/user */}
-        <div className="mt-8 p-6 bg-white/[0.03] border border-white/5 rounded-[2rem] w-full max-w-[340px]">
-           <div className="flex items-center gap-3 mb-4">
-              <span className="material-symbols-outlined text-primary">info</span>
-              <p className="text-white text-[10px] font-black uppercase">Development Notice:</p>
-           </div>
-           <p className="text-slate-400 text-[9px] font-medium leading-relaxed mb-4">
-             "Test Mode" is essential for finalizing your setup. Your code is correctly calling the Paddle API. Once you complete this test, you can apply for a Live account.
-           </p>
-           <div className="space-y-2 bg-black/40 p-4 rounded-xl border border-white/5">
-              <div className="flex justify-between text-[9px] font-bold">
-                 <span className="text-slate-500 uppercase">Test Card:</span>
-                 <span className="text-emerald-400 font-mono tracking-wider">4242 4242 4242 4242</span>
-              </div>
-              <div className="flex justify-between text-[9px] font-bold">
-                 <span className="text-slate-500 uppercase">CVC / Date:</span>
-                 <span className="text-emerald-400 font-mono">123 / Any Date</span>
-              </div>
-           </div>
-        </div>
+                     <div className="space-y-3">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-2">Select Amount (BDT)</label>
+                        <div className="grid grid-cols-2 gap-3">
+                            {[500, 1000, 2000, 5000].map(amt => (
+                            <button 
+                                key={amt}
+                                onClick={() => setAmount(amt)}
+                                className={`h-14 rounded-xl border font-black text-sm tabular-nums transition-all ${amount === amt ? 'bg-primary border-primary text-white shadow-lg' : 'bg-white/5 border-white/5 text-slate-500'}`}
+                            >
+                                ৳{amt.toLocaleString()}
+                            </button>
+                            ))}
+                        </div>
+                     </div>
 
-        <p className="mt-10 text-[8px] text-slate-700 font-black uppercase tracking-[0.4em] text-center max-w-[200px] leading-relaxed">
-           Baji369 Pro Sandbox Environment. Domain verification status: Development Ready.
-        </p>
+                     <button 
+                       onClick={() => setStep(2)}
+                       className="w-full h-16 bg-primary text-white rounded-2xl font-black uppercase tracking-[0.2em] text-[11px] shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2"
+                     >
+                       Next Step
+                       <span className="material-symbols-outlined">arrow_forward</span>
+                     </button>
+                  </div>
+               </div>
+             ) : (
+               <div className="space-y-6">
+                  <div className="bg-[#1a0d0e] border border-white/5 rounded-[3rem] p-8 space-y-6 shadow-2xl">
+                     <div className="text-center space-y-3">
+                        <div className={`size-16 rounded-3xl mx-auto flex items-center justify-center text-white ${providers.find(p => p.id === provider)?.color} shadow-2xl`}>
+                           <span className="material-symbols-outlined text-4xl">send_to_mobile</span>
+                        </div>
+                        <h3 className="text-white font-black text-xl uppercase italic tracking-tighter">Instructions</h3>
+                        <p className="text-slate-500 text-[10px] font-bold uppercase leading-relaxed tracking-widest">{t.paymentInstruction}</p>
+                     </div>
+
+                     <div className="p-6 bg-black/60 border border-white/10 rounded-2xl flex items-center justify-between">
+                        <div>
+                           <p className="text-slate-500 text-[8px] font-black uppercase tracking-widest">{t.merchantNo}</p>
+                           <p className="text-white text-xl font-black tracking-[0.2em] mt-1">01700000000</p>
+                        </div>
+                        <button 
+                          onClick={handleCopy}
+                          className="px-4 py-2 bg-primary/20 text-primary border border-primary/20 rounded-lg text-[10px] font-black uppercase tracking-widest active:scale-90 transition-transform"
+                        >
+                          {copied ? t.copied : t.copy}
+                        </button>
+                     </div>
+
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-2">{t.trxId}</label>
+                        <input 
+                          value={trxId}
+                          onChange={(e) => setTrxId(e.target.value.toUpperCase())}
+                          placeholder="8XJ9K0LP..."
+                          className="w-full h-16 bg-black border border-white/10 rounded-2xl px-6 text-white font-black uppercase tracking-widest focus:ring-1 focus:ring-primary outline-none transition-all"
+                        />
+                     </div>
+
+                     <button 
+                        onClick={handleSubmitTrx}
+                        disabled={!trxId || isSubmitting}
+                        className="w-full h-16 bg-emerald-500 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-[11px] shadow-xl shadow-emerald-900/20 active:scale-95 transition-all flex items-center justify-center gap-3"
+                     >
+                       {isSubmitting ? <div className="size-6 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : (
+                         <>
+                           <span className="material-symbols-outlined">check_circle</span>
+                           {t.submitRequest}
+                         </>
+                       )}
+                     </button>
+                  </div>
+               </div>
+             )}
+          </div>
+        )}
+
+        {view === 'paddle' && (
+          <div className="w-full max-w-[400px] animate-in slide-in-from-right duration-500">
+             <div className="bg-[#1a0d0e] border border-blue-500/20 rounded-[3rem] p-10 text-center shadow-2xl">
+                <div className="size-24 rounded-[2rem] bg-blue-500/10 flex items-center justify-center mx-auto mb-6 text-blue-500 border border-blue-500/20 shadow-inner">
+                   <span className="material-symbols-outlined text-5xl">public</span>
+                </div>
+                <h4 className="text-white font-black text-xl uppercase italic tracking-tighter mb-2">Global Checkout</h4>
+                <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-8">Visa, Mastercard, Google Pay</p>
+                <button className="w-full h-16 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-[11px] shadow-xl shadow-blue-900/30 active:scale-95 transition-transform flex items-center justify-center gap-3">
+                    <span className="material-symbols-outlined">payments</span>
+                    Pay with Card
+                </button>
+             </div>
+          </div>
+        )}
+
       </main>
     </div>
   );

@@ -14,10 +14,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
   const [users, setUsers] = useState<any[]>([]);
   const [activity, setActivity] = useState<any[]>([]);
   const [pendingDeposits, setPendingDeposits] = useState<any[]>([]);
-  const [depositLogs, setDepositLogs] = useState<any[]>([]);
   const [stats, setStats] = useState({ totalStakes: 0, totalPayouts: 0, netProfit: 0, totalBets: 0, activeUsers: 0 });
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'rigging' | 'games' | 'users' | 'activity' | 'broadcast' | 'reports' | 'deposits' | 'webhooks'>('reports');
+  const [activeTab, setActiveTab] = useState<'rigging' | 'games' | 'users' | 'activity' | 'broadcast' | 'reports' | 'deposits'>('reports');
   const [searchQuery, setSearchQuery] = useState('');
   
   const [notifTitle, setNotifTitle] = useState('');
@@ -40,13 +39,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
       const { data: deposits } = await getPendingTransactions();
       if (deposits) setPendingDeposits(deposits);
 
-      // Fetch all transactions to see webhook success
-      const { data: allTransactions } = await supabase
-        .from('transactions')
-        .select('*, profiles(email)')
-        .order('created_at', { ascending: false });
-      if (allTransactions) setDepositLogs(allTransactions);
-
       const { data: bets } = await supabase.from('bets').select('*');
       if (bets) {
         const totalStakes = bets.reduce((sum, b) => sum + Number(b.stake), 0);
@@ -67,7 +59,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
   const handleDepositAction = async (id: string, status: 'approved' | 'rejected', userId: string, amount: number) => {
     try {
       await updateTransactionStatus(id, status, userId, amount);
-      fetchData();
+      fetchData(); // Refresh data
     } catch (err) {
       alert("Failed to update deposit.");
     }
@@ -122,39 +114,17 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
 
       <div className="flex-1 overflow-y-auto no-scrollbar p-6 space-y-6 pb-32">
         <div className="flex bg-white/5 p-1 rounded-2xl border border-white/10 overflow-x-auto no-scrollbar gap-1">
-           {['reports', 'deposits', 'webhooks', 'rigging', 'broadcast', 'activity', 'users', 'games'].map((t) => (
+           {['reports', 'deposits', 'rigging', 'broadcast', 'activity', 'users', 'games'].map((t) => (
              <button key={t} onClick={() => setActiveTab(t as any)} className={`shrink-0 px-5 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${activeTab === t ? 'bg-primary text-white shadow-lg' : 'text-slate-500'}`}>{t}</button>
            ))}
         </div>
-
-        {/* WEBHOOKS LOGS TAB */}
-        {activeTab === 'webhooks' && (
-          <div className="space-y-4 animate-in slide-in-from-bottom">
-            <h3 className="text-white font-black text-sm uppercase px-2">Webhook History</h3>
-            <div className="space-y-3">
-               {depositLogs.map(log => (
-                 <div key={log.id} className="bg-white/5 border border-white/5 p-4 rounded-2xl flex items-center justify-between">
-                    <div>
-                       <p className="text-white text-[11px] font-black uppercase">{log.method} • ${log.amount}</p>
-                       <p className="text-slate-500 text-[8px] font-bold mt-1">{log.profiles?.email}</p>
-                    </div>
-                    <div className="text-right">
-                       <span className={`text-[8px] font-black px-2 py-0.5 rounded uppercase ${log.status === 'approved' ? 'bg-emerald-500/20 text-emerald-500' : 'bg-amber-500/20 text-amber-500'}`}>
-                          {log.status}
-                       </span>
-                    </div>
-                 </div>
-               ))}
-            </div>
-          </div>
-        )}
 
         {/* DEPOSIT REQUESTS TAB */}
         {activeTab === 'deposits' && (
           <div className="space-y-4 animate-in slide-in-from-bottom">
             <h3 className="text-white font-black text-sm uppercase px-2">Manual Verification ({pendingDeposits.length})</h3>
             {pendingDeposits.length > 0 ? pendingDeposits.map(dep => (
-              <div key={dep.id} className="bg-white/5 border border-white/10 rounded-[2rem] p-6 space-y-4">
+              <div key={dep.id} className="bg-white/5 border border-white/10 rounded-[2rem] p-6 space-y-4 shadow-xl">
                  <div className="flex justify-between items-start">
                     <div>
                        <p className="text-white font-black text-sm uppercase italic">{dep.method} - ৳{dep.amount}</p>
@@ -166,8 +136,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
                     </div>
                  </div>
                  <div className="flex gap-2">
-                    <button onClick={() => handleDepositAction(dep.id, 'approved', dep.user_id, dep.amount)} className="flex-1 h-12 bg-emerald-500 text-white rounded-xl font-black text-[10px] uppercase shadow-lg shadow-emerald-900/20">Approve</button>
-                    <button onClick={() => handleDepositAction(dep.id, 'rejected', dep.user_id, dep.amount)} className="flex-1 h-12 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl font-black text-[10px] uppercase">Reject</button>
+                    <button onClick={() => handleDepositAction(dep.id, 'approved', dep.user_id, dep.amount)} className="flex-1 h-12 bg-emerald-500 text-white rounded-xl font-black text-[10px] uppercase shadow-lg shadow-emerald-900/20 active:scale-95 transition-all">Approve</button>
+                    <button onClick={() => handleDepositAction(dep.id, 'rejected', dep.user_id, dep.amount)} className="flex-1 h-12 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl font-black text-[10px] uppercase active:scale-95 transition-all">Reject</button>
                  </div>
               </div>
             )) : (
@@ -183,11 +153,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
         {activeTab === 'reports' && (
            <div className="space-y-6 animate-in slide-in-from-bottom duration-500">
               <div className="grid grid-cols-2 gap-4">
-                 <div className="bg-[#1a0d0e] p-5 rounded-3xl border border-emerald-500/20">
+                 <div className="bg-[#1a0d0e] p-5 rounded-3xl border border-emerald-500/20 shadow-xl">
                     <p className="text-emerald-500 text-[8px] font-black uppercase tracking-widest mb-1">Total Stake (In)</p>
                     <h3 className="text-white text-2xl font-black tabular-nums">${stats.totalStakes.toLocaleString()}</h3>
                  </div>
-                 <div className="bg-[#1a0d0e] p-5 rounded-3xl border border-red-500/20">
+                 <div className="bg-[#1a0d0e] p-5 rounded-3xl border border-red-500/20 shadow-xl">
                     <p className="text-red-500 text-[8px] font-black uppercase tracking-widest mb-1">Total Payout (Out)</p>
                     <h3 className="text-white text-2xl font-black tabular-nums">${stats.totalPayouts.toLocaleString()}</h3>
                  </div>
@@ -199,27 +169,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
                     <h1 className={`text-6xl font-black tracking-tighter italic tabular-nums ${stats.netProfit >= 0 ? 'text-white' : 'text-red-500'}`}>
                       ${stats.netProfit.toLocaleString()}
                     </h1>
-                    <div className="mt-6 h-3 bg-white/5 rounded-full overflow-hidden flex">
-                       <div className="bg-emerald-500 h-full" style={{ width: `${(stats.totalStakes / (stats.totalStakes + stats.totalPayouts)) * 100}%` }}></div>
-                       <div className="bg-red-500 h-full" style={{ width: `${(stats.totalPayouts / (stats.totalStakes + stats.totalPayouts)) * 100}%` }}></div>
-                    </div>
-                    <div className="flex justify-between mt-3 text-[8px] font-black uppercase text-slate-500">
-                       <span>Profit Margin: {((stats.netProfit / stats.totalStakes) * 100 || 0).toFixed(2)}%</span>
-                       <span>Bets: {stats.totalBets}</span>
-                    </div>
                  </div>
               </div>
            </div>
         )}
 
-        {/* REST OF THE TABS RENDERED NORMALLY */}
+        {/* BROADCAST TAB */}
         {activeTab === 'broadcast' && (
            <div className="space-y-4 animate-in slide-in-from-bottom duration-500">
               <div className="bg-[#1a0d0e] p-6 rounded-[2.5rem] border border-white/5 space-y-4 shadow-xl">
-                 <div className="flex items-center gap-3 mb-2">
-                    <span className="material-symbols-outlined text-primary">campaign</span>
-                    <h3 className="text-white font-black text-sm uppercase">Global Notification</h3>
-                 </div>
+                 <h3 className="text-white font-black text-sm uppercase px-1">Global Notification</h3>
                  <input value={notifTitle} onChange={e => setNotifTitle(e.target.value)} placeholder="Title" className="w-full h-14 bg-white/5 border border-white/10 rounded-2xl px-5 text-white font-bold outline-none" />
                  <textarea value={notifMsg} onChange={e => setNotifMsg(e.target.value)} placeholder="Message" className="w-full h-32 bg-white/5 border border-white/10 rounded-2xl p-5 text-white font-medium outline-none resize-none" />
                  <button onClick={handleBroadcast} disabled={isBroadcasting} className="w-full h-16 bg-primary text-white rounded-[2rem] font-black uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all">
@@ -230,7 +189,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
         )}
 
         {activeTab === 'activity' && (
-           <div className="space-y-3 animate-in slide-in-from-bottom duration-500">
+           <div className="space-y-3">
               {activity.map((log, i) => (
                 <div key={i} className="bg-white/5 border border-white/5 rounded-2xl p-4 flex items-center justify-between">
                    <div className="flex items-center gap-4">
@@ -246,7 +205,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
                       <p className={`text-xs font-black ${log.status === 'won' ? 'text-emerald-500' : 'text-slate-500'}`}>
                         {log.status === 'won' ? `+$${log.payout}` : `-$${log.stake}`}
                       </p>
-                      <p className="text-[7px] text-slate-600 font-black uppercase">{log.multiplier}x</p>
                    </div>
                 </div>
               ))}

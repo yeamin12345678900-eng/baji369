@@ -4,6 +4,9 @@ import { createClient } from '@supabase/supabase-js';
 const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || process.env?.VITE_SUPABASE_URL || 'https://anwivgcqxakbyajfueth.supabase.co';
 const SUPABASE_ANON_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || process.env?.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFud2l2Z2NxeGFrYnlhamZ1ZXRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjczMzgxNDAsImV4cCI6MjA4MjkxNDE0MH0.BS_S6f9330G0wcx9X67ZbySxkIKuGBz5gh0tk13Z4eE';
 
+// YOUR RUPANTORPAY API CONFIGURATION
+export const RUPANTOR_API_KEY = 'o8qWkbWQBg6EuF03LP3WvfM5lH860GxnWPvGXVw8sz1wUyyQwc';
+
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 export const getUserProfile = async (userId: string) => {
@@ -20,7 +23,7 @@ export const updateUserProfile = async (userId: string, updates: any) => {
   } catch (err) { return { data: null, error: err }; }
 };
 
-// --- TRANSACTION FUNCTIONS ---
+// --- TRANSACTION LOGIC ---
 
 export const submitDepositRequest = async (depositData: { 
   user_id: string, 
@@ -28,6 +31,7 @@ export const submitDepositRequest = async (depositData: {
   method: string, 
   transaction_id: string 
 }) => {
+  // We include the API key in the submission context (if needed by your logging)
   return await supabase.from('transactions').insert([{
     ...depositData,
     status: 'pending',
@@ -45,7 +49,6 @@ export const getPendingTransactions = async () => {
 };
 
 export const updateTransactionStatus = async (transactionId: string, status: 'approved' | 'rejected', userId: string, amount: number) => {
-  // 1. Update the transaction status
   const { error: transError } = await supabase
     .from('transactions')
     .update({ status })
@@ -53,18 +56,19 @@ export const updateTransactionStatus = async (transactionId: string, status: 'ap
 
   if (transError) throw transError;
 
-  // 2. If approved, update user balance
   if (status === 'approved') {
     const { data: profile } = await getUserProfile(userId);
     if (profile) {
-      const newBalance = (profile.balance || 0) + amount;
+      // Assuming 1 USD = 120 BDT conversion
+      const usdAmount = amount / 120;
+      const newBalance = (Number(profile.balance) || 0) + usdAmount;
+      
       await updateUserProfile(userId, { balance: newBalance });
       
-      // 3. Send notification
       await supabase.from('notifications').insert([{
         user_id: userId,
-        title: 'Deposit Approved',
-        desc: `Your deposit of $${amount} has been approved and added to your balance.`,
+        title: 'Deposit Approved ✅',
+        desc: `Your ৳${amount} ($${usdAmount.toFixed(2)}) deposit has been added to your wallet.`,
         type: 'win',
         unread: true
       }]);
@@ -73,7 +77,7 @@ export const updateTransactionStatus = async (transactionId: string, status: 'ap
   return { success: true };
 };
 
-// --- ADMIN CONTROL FUNCTIONS ---
+// --- GLOBAL SETTINGS & ADMIN ---
 
 export const getGlobalSettings = async () => {
   const { data, error } = await supabase.from('settings').select('*').single();
@@ -124,4 +128,4 @@ export const getUserNotifications = async (userId: string) => {
 
 export const getPlatformActivity = async () => {
   return await supabase.from('bets').select('*, profiles(first_name, last_name, email)').order('created_at', { ascending: false }).limit(50);
-};
+}
