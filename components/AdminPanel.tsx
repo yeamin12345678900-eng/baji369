@@ -24,11 +24,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
   const [notifMsg, setNotifMsg] = useState('');
   const [isBroadcasting, setIsBroadcasting] = useState(false);
 
-  // Payment Numbers State
+  // Payment Numbers & Status State
   const [paymentNumbers, setPaymentNumbers] = useState({
     bkash: '01700000000',
     nagad: '01700000000',
     rocket: '01700000000'
+  });
+  const [methodStatus, setMethodStatus] = useState<Record<string, boolean>>({
+    bkash: true,
+    nagad: true,
+    rocket: true
   });
   const [isSavingPayments, setIsSavingPayments] = useState(false);
 
@@ -51,11 +56,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
       const { data: withdraws } = await getPendingWithdrawals();
       if (withdraws) setPendingWithdraws(withdraws);
 
-      const { data: globalSets, error: fetchErr } = await getGlobalSettings();
-      if (globalSets?.payment_numbers) {
-        setPaymentNumbers(globalSets.payment_numbers);
-      } else {
-        console.warn("No payment numbers found in settings, using defaults.");
+      const { data: globalSets } = await getGlobalSettings();
+      if (globalSets) {
+        if (globalSets.payment_numbers) setPaymentNumbers(globalSets.payment_numbers);
+        if (globalSets.method_status) setMethodStatus(globalSets.method_status);
       }
 
       const { data: bets } = await supabase.from('bets').select('*');
@@ -78,12 +82,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
   const handleSavePayments = async () => {
     setIsSavingPayments(true);
     try {
-      const { error } = await updateGlobalSettings({ payment_numbers: paymentNumbers });
+      // Send both payment_numbers and method_status to be sure they stay in sync
+      const { error } = await updateGlobalSettings({ 
+        payment_numbers: paymentNumbers,
+        method_status: methodStatus 
+      });
       if (error) throw error;
-      alert("Success: Merchant numbers updated and synchronized!");
+      alert("SUCCESS: Database updated successfully!");
     } catch (err: any) {
-      console.error("Save Error:", err);
-      alert(`Error: ${err.message || "Failed to update numbers. Check SQL Console."}`);
+      console.error("Save error:", err);
+      alert(`ERROR: Could not save. Make sure you ran the SQL script in Supabase! \n\nDetails: ${err.message}`);
     } finally {
       setIsSavingPayments(false);
     }
@@ -161,46 +169,62 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
            ))}
         </div>
 
-        {/* PAYMENT SETTINGS TAB */}
         {activeTab === 'payments' && (
           <div className="space-y-6 animate-in slide-in-from-bottom">
-            <div className="bg-[#1a0d0e] p-6 rounded-[2.5rem] border border-white/5 space-y-5 shadow-xl">
-               <h3 className="text-white font-black text-sm uppercase px-1">Merchant Numbers</h3>
+            <div className="bg-[#1a0d0e] p-6 rounded-[2.5rem] border border-white/5 space-y-6 shadow-xl">
+               <h3 className="text-white font-black text-sm uppercase px-1">Withdrawal Method Control</h3>
+               
+               <div className="grid grid-cols-1 gap-4">
+                  {['bkash', 'nagad', 'rocket'].map(m => (
+                    <div key={m} className="bg-white/5 p-4 rounded-2xl border border-white/5 flex items-center justify-between">
+                       <div className="flex items-center gap-4">
+                          <div className={`size-10 rounded-xl flex items-center justify-center ${m === 'bkash' ? 'bg-pink-500/20 text-pink-500' : m === 'nagad' ? 'bg-orange-500/20 text-orange-500' : 'bg-purple-500/20 text-purple-500'}`}>
+                             <span className="material-symbols-outlined text-[22px] filled">{m === 'bkash' ? 'account_balance_wallet' : m === 'nagad' ? 'payments' : 'rocket_launch'}</span>
+                          </div>
+                          <span className="text-white font-black text-xs uppercase tracking-widest">{m}</span>
+                       </div>
+                       <button 
+                        onClick={() => setMethodStatus({...methodStatus, [m]: !methodStatus[m]})}
+                        className={`w-14 h-8 rounded-full p-1 transition-all ${methodStatus[m] ? 'bg-emerald-500' : 'bg-red-500'}`}
+                       >
+                          <div className={`size-6 bg-white rounded-full transition-transform ${methodStatus[m] ? 'translate-x-6' : ''}`} />
+                       </button>
+                    </div>
+                  ))}
+               </div>
+
+               <h3 className="text-white font-black text-sm uppercase px-1 pt-4">Merchant Numbers</h3>
                
                <div className="space-y-4">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-2">bKash Personal/Merchant</label>
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-2">bKash Number</label>
                     <input value={paymentNumbers.bkash} onChange={e => setPaymentNumbers({...paymentNumbers, bkash: e.target.value})} className="w-full h-14 bg-white/5 border border-white/10 rounded-2xl px-5 text-white font-bold outline-none focus:border-pink-500 transition-all" placeholder="01XXXXXXXXX" />
                   </div>
                   
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-2">Nagad Personal/Merchant</label>
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-2">Nagad Number</label>
                     <input value={paymentNumbers.nagad} onChange={e => setPaymentNumbers({...paymentNumbers, nagad: e.target.value})} className="w-full h-14 bg-white/5 border border-white/10 rounded-2xl px-5 text-white font-bold outline-none focus:border-orange-500 transition-all" placeholder="01XXXXXXXXX" />
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-2">Rocket Personal/Merchant</label>
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-2">Rocket Number</label>
                     <input value={paymentNumbers.rocket} onChange={e => setPaymentNumbers({...paymentNumbers, rocket: e.target.value})} className="w-full h-14 bg-white/5 border border-white/10 rounded-2xl px-5 text-white font-bold outline-none focus:border-purple-500 transition-all" placeholder="01XXXXXXXXX" />
                   </div>
                </div>
 
-               <button onClick={handleSavePayments} disabled={isSavingPayments} className="w-full h-16 bg-emerald-500 text-white rounded-[2rem] font-black uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all flex items-center justify-center gap-3">
+               <button onClick={handleSavePayments} disabled={isSavingPayments} className="w-full h-16 bg-primary text-white rounded-[2rem] font-black uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all flex items-center justify-center gap-3">
                   {isSavingPayments ? <div className="size-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : (
                     <>
                       <span className="material-symbols-outlined">save</span>
-                      UPDATE NUMBERS
+                      SAVE ALL SETTINGS
                     </>
                   )}
                </button>
             </div>
-            
-            <div className="p-5 bg-blue-500/5 border border-blue-500/20 rounded-2xl">
-               <p className="text-[10px] text-blue-400 font-bold leading-relaxed">১. উপরে SQL কোডটি অবশ্যই একবার রান করবেন। ২. নাম্বার সেভ করার পর একবার ব্রাউজার রিফ্রেশ দিবেন।</p>
-            </div>
           </div>
         )}
 
-        {/* REST OF THE TABS (REMAINS SAME AS PREVIOUS) */}
+        {/* REST OF THE TABS */}
         {activeTab === 'withdrawals' && (
           <div className="space-y-4 animate-in slide-in-from-bottom">
             <h3 className="text-white font-black text-sm uppercase px-2">Withdrawals ({pendingWithdraws.length})</h3>

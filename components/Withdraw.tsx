@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Language } from '../services/translations';
-import { supabase, submitWithdrawRequest } from '../services/supabase';
+import { supabase, submitWithdrawRequest, getGlobalSettings } from '../services/supabase';
 
 interface WithdrawProps {
   lang: Language;
@@ -17,21 +17,48 @@ const Withdraw: React.FC<WithdrawProps> = ({ lang, balance, onBack, onWithdrawSu
   const [phone, setPhone] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [methodStatus, setMethodStatus] = useState<Record<string, boolean>>({
+    bkash: true,
+    nagad: true,
+    rocket: true
+  });
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user));
+    
+    // Fetch method status from global settings
+    const fetchSettings = async () => {
+      const { data } = await getGlobalSettings();
+      if (data?.method_status) {
+        setMethodStatus(data.method_status);
+        
+        // If current selected is disabled, select first available
+        const currentLower = selectedMethod.toLowerCase();
+        if (data.method_status[currentLower] === false) {
+            if (data.method_status.bkash) setSelectedMethod('BKASH');
+            else if (data.method_status.nagad) setSelectedMethod('NAGAD');
+            else if (data.method_status.rocket) setSelectedMethod('ROCKET');
+        }
+      }
+    };
+    fetchSettings();
   }, []);
 
   const methods = [
-    { id: 'BKASH', label: 'bKash', color: 'bg-[#D12053]', icon: 'account_balance_wallet' },
-    { id: 'NAGAD', label: 'Nagad', color: 'bg-[#F16022]', icon: 'payments' },
-    { id: 'ROCKET', label: 'Rocket', color: 'bg-[#8C3494]', icon: 'rocket_launch' },
+    { id: 'BKASH', label: 'bKash', color: 'bg-[#D12053]', icon: 'account_balance_wallet', statusKey: 'bkash' },
+    { id: 'NAGAD', label: 'Nagad', color: 'bg-[#F16022]', icon: 'payments', statusKey: 'nagad' },
+    { id: 'ROCKET', label: 'Rocket', color: 'bg-[#8C3494]', icon: 'rocket_launch', statusKey: 'rocket' },
   ];
 
   const handleWithdraw = async () => {
-    // CRITICAL: Double safety check for demo mode
     if (isDemo) {
       alert(lang === 'en' ? "Withdrawal is blocked in Demo Mode!" : "ডেমো মোডে টাকা উত্তোলন বন্ধ!");
+      return;
+    }
+
+    const currentMethodActive = methodStatus[selectedMethod.toLowerCase()];
+    if (currentMethodActive === false) {
+      alert(lang === 'en' ? "This method is currently under maintenance." : "এই মেথডটি বর্তমানে রক্ষণাবেক্ষণের অধীনে আছে।");
       return;
     }
 
@@ -59,18 +86,14 @@ const Withdraw: React.FC<WithdrawProps> = ({ lang, balance, onBack, onWithdrawSu
     
     setIsProcessing(true);
     try {
-      // In Supabase, this will record the transaction and deduct balance
       await submitWithdrawRequest(user.id, numAmount, selectedMethod, phone);
-      
       alert(lang === 'en' 
         ? "Withdrawal request submitted! Payout will be processed within 24 hours." 
         : "রিকোয়েস্ট সফল হয়েছে! পরবর্তী ২৪ ঘণ্টার মধ্যে পেমেন্ট সম্পন্ন করা হবে।");
-      
       onWithdrawSuccess(numAmount);
       onBack();
     } catch (err: any) {
-      console.error("Withdraw Error:", err);
-      alert("Error: " + (err.message || "Failed to process request. Try again later."));
+      alert("Error: " + (err.message || "Failed to process request."));
     } finally {
       setIsProcessing(false);
     }
@@ -112,21 +135,29 @@ const Withdraw: React.FC<WithdrawProps> = ({ lang, balance, onBack, onWithdrawSu
         <section className="mt-8">
             <h3 className="text-white text-xs font-black px-6 mb-4 uppercase tracking-widest italic">Choose Method</h3>
             <div className="grid grid-cols-3 gap-3 px-5">
-                {methods.map((method) => (
-                    <button 
-                        key={method.id}
-                        disabled={isDemo}
-                        onClick={() => setSelectedMethod(method.id)}
-                        className={`relative flex flex-col items-center gap-3 p-4 rounded-2xl border-2 transition-all active:scale-95 ${
-                            selectedMethod === method.id ? 'bg-primary/10 border-primary shadow-lg' : 'bg-white/5 border-transparent text-slate-500'
-                        } ${isDemo ? 'opacity-50' : ''}`}
-                    >
-                        <div className={`w-10 h-10 rounded-xl ${method.color} flex items-center justify-center text-white shrink-0 shadow-lg`}>
-                            <span className="material-symbols-outlined text-[20px] filled">{method.icon}</span>
-                        </div>
-                        <p className={`text-[9px] font-black uppercase tracking-wider ${selectedMethod === method.id ? 'text-white' : 'text-slate-500'}`}>{method.label}</p>
-                    </button>
-                ))}
+                {methods.map((method) => {
+                    const isActive = methodStatus[method.statusKey];
+                    return (
+                        <button 
+                            key={method.id}
+                            disabled={isDemo || !isActive}
+                            onClick={() => setSelectedMethod(method.id)}
+                            className={`relative flex flex-col items-center gap-3 p-4 rounded-2xl border-2 transition-all active:scale-95 ${
+                                selectedMethod === method.id ? 'bg-primary/10 border-primary shadow-lg' : 'bg-white/5 border-transparent text-slate-500'
+                            } ${(!isActive || isDemo) ? 'opacity-30 grayscale' : ''}`}
+                        >
+                            {!isActive && (
+                                <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40 rounded-2xl">
+                                    <span className="bg-red-600 text-white text-[6px] font-black px-1 py-0.5 rounded-sm uppercase rotate-[-15deg]">Offline</span>
+                                </div>
+                            )}
+                            <div className={`w-10 h-10 rounded-xl ${method.color} flex items-center justify-center text-white shrink-0 shadow-lg`}>
+                                <span className="material-symbols-outlined text-[20px] filled">{method.icon}</span>
+                            </div>
+                            <p className={`text-[9px] font-black uppercase tracking-wider ${selectedMethod === method.id ? 'text-white' : 'text-slate-500'}`}>{method.label}</p>
+                        </button>
+                    );
+                })}
             </div>
         </section>
 
@@ -167,15 +198,6 @@ const Withdraw: React.FC<WithdrawProps> = ({ lang, balance, onBack, onWithdrawSu
                     <span className="text-white text-[10px] font-black uppercase tracking-widest">Net Arrival</span>
                     <span className="text-emerald-400 font-black text-xl italic tabular-nums">${finalAmount}</span>
                 </div>
-            </div>
-        </section>
-
-        <section className="mt-8 px-5">
-            <div className="flex items-start gap-4 p-5 bg-white/5 border border-white/5 rounded-2xl">
-                <span className="material-symbols-outlined text-primary">verified_user</span>
-                <p className="text-[10px] text-slate-500 leading-relaxed font-bold uppercase tracking-tight">
-                    Your request will be manually reviewed by our finance team for security compliance.
-                </p>
             </div>
         </section>
       </main>
