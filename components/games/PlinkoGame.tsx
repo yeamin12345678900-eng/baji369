@@ -9,6 +9,12 @@ interface Ball {
 const ROWS = 8;
 const MULTIPLIERS = [15.0, 0.0, 0.5, 0.0, 0.0, 0.05, 0.2, 0.0, 10.0];
 
+const SOUNDS = {
+  drop: 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3',
+  hit: 'https://assets.mixkit.co/active_storage/sfx/2017/2017-preview.mp3',
+  win: 'https://assets.mixkit.co/active_storage/sfx/2019/2019-preview.mp3'
+};
+
 const BACKGROUND_URL = "https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=2070&auto=format&fit=crop";
 
 const PlinkoGame: React.FC<{ 
@@ -22,21 +28,46 @@ const PlinkoGame: React.FC<{
   const [balls, setBalls] = useState<Ball[]>([]);
   const [activeBucket, setActiveBucket] = useState<number | null>(null);
   const [isDropping, setIsDropping] = useState(false);
+  const audioRefs = useRef<{ [key: string]: HTMLAudioElement }>({});
+
+  useEffect(() => {
+    Object.entries(SOUNDS).forEach(([key, url]) => {
+      audioRefs.current[key] = new Audio(url);
+    });
+  }, []);
+
+  const playSound = (key: keyof typeof SOUNDS) => {
+    const sound = audioRefs.current[key];
+    if (sound) {
+      sound.currentTime = 0;
+      sound.play().catch(() => {});
+    }
+  };
 
   const dropBall = () => {
     if (balance < bet || isDropping) return;
     setIsDropping(true);
     onUpdateBalance(balance - bet);
+    playSound('drop');
+
+    // Simulate hitting pegs sound at intervals
+    const interval = setInterval(() => playSound('hit'), 400);
+
     const targetBucket = [1, 3, 4, 7][Math.floor(Math.random() * 4)];
     const newBall: Ball = { id: Date.now() + Math.random(), targetBucket };
     setBalls(prev => [...prev, newBall]);
+
     setTimeout(() => {
+      clearInterval(interval);
       const winMult = MULTIPLIERS[targetBucket];
       onUpdateBalance(balance - bet + (bet * winMult));
       setActiveBucket(targetBucket);
+      if (winMult > 0) playSound('win');
+      
       setTimeout(() => setActiveBucket(null), 600);
       setBalls(prev => prev.filter(b => b.id !== newBall.id));
       setIsDropping(false);
+      if (onSaveBet) onSaveBet({ game_name: 'Plinko', stake: bet, multiplier: winMult, payout: bet * winMult, status: winMult > 0 ? 'won' : 'lost' });
     }, 2800);
   };
 

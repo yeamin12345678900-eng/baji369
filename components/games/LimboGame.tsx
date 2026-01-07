@@ -9,6 +9,12 @@ interface LimboGameProps {
   onBack: () => void;
 }
 
+const SOUNDS = {
+  roll: 'https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3',
+  win: 'https://assets.mixkit.co/active_storage/sfx/2019/2019-preview.mp3',
+  lost: 'https://assets.mixkit.co/active_storage/sfx/2572/2572-preview.mp3'
+};
+
 const BACKGROUND_URL = "https://images.unsplash.com/photo-1550684848-fac1c5b4e853?q=80&w=2070&auto=format&fit=crop";
 
 const LimboGame: React.FC<LimboGameProps> = ({ balance, onUpdateBalance, onSaveBet, riggingIntensity = 0.5, onBack }) => {
@@ -17,21 +23,43 @@ const LimboGame: React.FC<LimboGameProps> = ({ balance, onUpdateBalance, onSaveB
   const [result, setResult] = useState<number | null>(null);
   const [isRolling, setIsRolling] = useState(false);
   const [status, setStatus] = useState<'idle' | 'won' | 'lost'>('idle');
+  const audioRefs = useRef<{ [key: string]: HTMLAudioElement }>({});
+
+  useEffect(() => {
+    Object.entries(SOUNDS).forEach(([key, url]) => {
+      audioRefs.current[key] = new Audio(url);
+    });
+  }, []);
+
+  const playSound = (key: keyof typeof SOUNDS) => {
+    const sound = audioRefs.current[key];
+    if (sound) {
+      sound.currentTime = 0;
+      sound.play().catch(() => {});
+    }
+  };
 
   const roll = () => {
-    if (balance < bet) return;
+    if (balance < bet || isRolling) return;
     setIsRolling(true);
     setStatus('idle');
     onUpdateBalance(balance - bet);
+    playSound('roll');
+
     setTimeout(() => {
       const res = parseFloat((0.99 / (1 - Math.random())).toFixed(2));
       setResult(res);
       setIsRolling(false);
       if (res >= target) {
         setStatus('won');
-        onUpdateBalance(balance - bet + (bet * target));
+        playSound('win');
+        const payout = bet * target;
+        onUpdateBalance(balance - bet + payout);
+        if (onSaveBet) onSaveBet({ game_name: 'Limbo', stake: bet, multiplier: target, payout, status: 'won' });
       } else {
         setStatus('lost');
+        playSound('lost');
+        if (onSaveBet) onSaveBet({ game_name: 'Limbo', stake: bet, multiplier: 0, payout: 0, status: 'lost' });
       }
     }, 600);
   };

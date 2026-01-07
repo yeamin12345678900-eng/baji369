@@ -1,8 +1,14 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || process.env?.VITE_SUPABASE_URL || 'https://anwivgcqxakbyajfueth.supabase.co';
-const SUPABASE_ANON_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || process.env?.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFud2l2Z2NxeGFrYnlhamZ1ZXRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjczMzgxNDAsImV4cCI6MjA4MjkxNDE0MH0.BS_S6f9330G0wcx9X67ZbySxkIKuGBz5gh0tk13Z4eE';
+const getEnv = (key: string) => {
+  if (typeof import.meta !== 'undefined' && (import.meta as any).env?.[key]) return (import.meta as any).env[key];
+  if (typeof process !== 'undefined' && process.env?.[key]) return process.env[key];
+  return undefined;
+};
+
+const SUPABASE_URL = getEnv('VITE_SUPABASE_URL') || 'https://anwivgcqxakbyajfueth.supabase.co';
+const SUPABASE_ANON_KEY = getEnv('VITE_SUPABASE_ANON_KEY') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFud2l2Z2NxeGFrYnlhamZ1ZXRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjczMzgxNDAsImV4cCI6MjA4MjkxNDE0MH0.BS_S6f9330G0wcx9X67ZbySxkIKuGBz5gh0tk13Z4eE';
 
 export const RUPANTOR_API_KEY = 'o8qWkbWQBg6EuF03LP3WvfM5lH860GxnWPvGXVw8sz1wUyyQwc';
 

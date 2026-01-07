@@ -29,6 +29,12 @@ const SPECIAL_REEL = [
   { id: 'blank', label: '0', multiplier: 0, weight: 40 },
 ];
 
+const SOUNDS = {
+  spin: 'https://assets.mixkit.co/active_storage/sfx/2017/2017-preview.mp3',
+  win: 'https://assets.mixkit.co/active_storage/sfx/2019/2019-preview.mp3',
+  jackpot: 'https://assets.mixkit.co/active_storage/sfx/2018/2018-preview.mp3'
+};
+
 const BACKGROUND_URL = "https://images.unsplash.com/photo-1596838132731-3301c3fd4317?q=80&w=2070&auto=format&fit=crop";
 
 const Crazy777Game: React.FC<Crazy777GameProps> = ({ balance, onUpdateBalance, onSaveBet, riggingIntensity = 0.5, onBack }) => {
@@ -37,6 +43,21 @@ const Crazy777Game: React.FC<Crazy777GameProps> = ({ balance, onUpdateBalance, o
   const [special, setSpecial] = useState<any>(SPECIAL_REEL[0]);
   const [isSpinning, setIsSpinning] = useState(false);
   const [winAmount, setWinAmount] = useState<number | null>(null);
+  const audioRefs = useRef<{ [key: string]: HTMLAudioElement }>({});
+
+  useEffect(() => {
+    Object.entries(SOUNDS).forEach(([key, url]) => {
+      audioRefs.current[key] = new Audio(url);
+    });
+  }, []);
+
+  const playSound = (key: keyof typeof SOUNDS) => {
+    const sound = audioRefs.current[key];
+    if (sound) {
+      sound.currentTime = 0;
+      sound.play().catch(() => {});
+    }
+  };
 
   const getRandomSymbol = (list: any[]) => {
     const totalWeight = list.reduce((acc, sym) => acc + sym.weight, 0);
@@ -53,6 +74,8 @@ const Crazy777Game: React.FC<Crazy777GameProps> = ({ balance, onUpdateBalance, o
     setIsSpinning(true);
     setWinAmount(null);
     onUpdateBalance(balance - bet);
+    playSound('spin');
+
     setTimeout(() => {
       const res1 = getRandomSymbol(SYMBOLS);
       const res2 = getRandomSymbol(SYMBOLS);
@@ -61,11 +84,17 @@ const Crazy777Game: React.FC<Crazy777GameProps> = ({ balance, onUpdateBalance, o
       setReels([res1, res2, res3]);
       setSpecial(spec);
       setIsSpinning(false);
+      
       if (res1.id !== 'blank' && res1.id === res2.id && res2.id === res3.id) {
         const mult = spec.multiplier || 1;
         const payout = (res1.value * (bet / 10) * mult);
         setWinAmount(payout);
         onUpdateBalance(balance - bet + payout);
+        if (payout > bet * 10) playSound('jackpot');
+        else playSound('win');
+        if (onSaveBet) onSaveBet({ game_name: 'Crazy777', stake: bet, multiplier: payout/bet, payout, status: 'won' });
+      } else {
+        if (onSaveBet) onSaveBet({ game_name: 'Crazy777', stake: bet, multiplier: 0, payout: 0, status: 'lost' });
       }
     }, 1500);
   };

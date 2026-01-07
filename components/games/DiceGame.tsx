@@ -9,6 +9,12 @@ interface DiceGameProps {
   onBack: () => void;
 }
 
+const SOUNDS = {
+  roll: 'https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3',
+  win: 'https://assets.mixkit.co/active_storage/sfx/2019/2019-preview.mp3',
+  lost: 'https://assets.mixkit.co/active_storage/sfx/2572/2572-preview.mp3'
+};
+
 const BACKGROUND_URL = "https://images.unsplash.com/photo-1511193311914-0346f16efe90?q=80&w=2073&auto=format&fit=crop";
 
 const DiceGame: React.FC<DiceGameProps> = ({ balance, onUpdateBalance, onSaveBet, riggingIntensity = 0.5, onBack }) => {
@@ -18,15 +24,32 @@ const DiceGame: React.FC<DiceGameProps> = ({ balance, onUpdateBalance, onSaveBet
   const [result, setResult] = useState<number | null>(null);
   const [isRolling, setIsRolling] = useState(false);
   const [status, setStatus] = useState<'idle' | 'won' | 'lost'>('idle');
+  const audioRefs = useRef<{ [key: string]: HTMLAudioElement }>({});
+
+  useEffect(() => {
+    Object.entries(SOUNDS).forEach(([key, url]) => {
+      audioRefs.current[key] = new Audio(url);
+    });
+  }, []);
+
+  const playSound = (key: keyof typeof SOUNDS) => {
+    const sound = audioRefs.current[key];
+    if (sound) {
+      sound.currentTime = 0;
+      sound.play().catch(() => {});
+    }
+  };
 
   const winProbability = mode === 'over' ? 100 - target : target;
   const multiplier = parseFloat((99 / winProbability).toFixed(4));
 
   const roll = () => {
-    if (balance < bet) return;
+    if (balance < bet || isRolling) return;
     setIsRolling(true);
     setStatus('idle');
     onUpdateBalance(balance - bet);
+    playSound('roll');
+
     setTimeout(() => {
       const res = Math.floor(Math.random() * 101);
       setResult(res);
@@ -34,9 +57,14 @@ const DiceGame: React.FC<DiceGameProps> = ({ balance, onUpdateBalance, onSaveBet
       const isWin = mode === 'over' ? res > target : res < target;
       if (isWin) {
         setStatus('won');
-        onUpdateBalance(balance - bet + (bet * multiplier));
+        playSound('win');
+        const payout = bet * multiplier;
+        onUpdateBalance(balance - bet + payout);
+        if (onSaveBet) onSaveBet({ game_name: 'Dice', stake: bet, multiplier, payout, status: 'won' });
       } else {
         setStatus('lost');
+        playSound('lost');
+        if (onSaveBet) onSaveBet({ game_name: 'Dice', stake: bet, multiplier: 0, payout: 0, status: 'lost' });
       }
     }, 400);
   };
