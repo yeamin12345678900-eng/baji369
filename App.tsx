@@ -1,28 +1,39 @@
 
 import React, { useState, useEffect } from 'react';
+import { supabase, getUserProfile, saveBetRecord } from './services/supabase';
 import { Language } from './services/translations';
-import { supabase, getUserProfile, saveBetRecord, getGlobalSettings } from './services/supabase';
+
+// Import components
 import LoginForm from './components/LoginForm';
 import RegisterForm from './components/RegisterForm';
+import ForgotPassword from './components/ForgotPassword';
+import ResetPassword from './components/ResetPassword';
 import Dashboard from './components/Dashboard';
 import SportsBetting from './components/SportsBetting';
 import LiveCasino from './components/LiveCasino';
+import MiniGamesHub from './components/MiniGamesHub';
 import Promotions from './components/Promotions';
 import Wallet from './components/Wallet';
 import Deposit from './components/Deposit';
 import Withdraw from './components/Withdraw';
-import Notifications from './components/Notifications';
-import HelpSupport from './components/HelpSupport';
 import ProfileSettings from './components/ProfileSettings';
 import PersonalDetails from './components/PersonalDetails';
 import VerificationCenter from './components/VerificationCenter';
 import ChangePassword from './components/ChangePassword';
-import ForgotPassword from './components/ForgotPassword';
-import ResetPassword from './components/ResetPassword';
 import MyBets from './components/MyBets';
 import VipRewards from './components/VipRewards';
+import Notifications from './components/Notifications';
+import HelpSupport from './components/HelpSupport';
+import AboutUs from './components/AboutUs';
+import TermsConditions from './components/TermsConditions';
+import PrivacyPolicy from './components/PrivacyPolicy';
+import EditProfilePicture from './components/EditProfilePicture';
+import GameDetail from './components/GameDetail';
+import DailySpin from './components/DailySpin';
 import BottomNav from './components/BottomNav';
-import MiniGamesHub from './components/MiniGamesHub';
+import InstallAppModal from './components/InstallAppModal';
+
+// Mini Games
 import CrashGame from './components/games/CrashGame';
 import AviatorGame from './components/games/AviatorGame';
 import Crazy777Game from './components/games/Crazy777Game';
@@ -32,254 +43,153 @@ import LimboGame from './components/games/LimboGame';
 import DiceGame from './components/games/DiceGame';
 import PlinkoGame from './components/games/PlinkoGame';
 import AdminPanel from './components/AdminPanel';
-import DailySpin from './components/DailySpin';
-import AboutUs from './components/AboutUs';
-import TermsConditions from './components/TermsConditions';
-import PrivacyPolicy from './components/PrivacyPolicy';
-import EditProfilePicture from './components/EditProfilePicture';
-import GameDetail from './components/GameDetail';
-import InstallAppModal from './components/InstallAppModal';
 
 export type ViewType = 'login' | 'register' | 'forgot-password' | 'reset-password' | 'dashboard' | 'sports' | 'casino' | 'game-detail' | 'promotions' | 'wallet' | 'deposit' | 'withdraw' | 'profile' | 'edit-profile' | 'personal-details' | 'verification-center' | 'change-password' | 'my-bets' | 'vip-rewards' | 'notifications' | 'help-support' | 'mini-games' | 'crash-game' | 'aviator-game' | 'crazy777-game' | 'mines-game' | 'penalty-game' | 'limbo-game' | 'dice-game' | 'plinko-game' | 'admin' | 'about-us' | 'terms' | 'privacy';
 
 const App: React.FC = () => {
   const [lang, setLang] = useState<Language>('en');
   const [currentView, setCurrentView] = useState<ViewType>('login');
+  const [historyType, setHistoryType] = useState<'bets' | 'transactions'>('bets');
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
-  const [balance, setBalance] = useState(0); 
+  const [balance, setBalance] = useState(0);
   const [isDemo, setIsDemo] = useState(false);
-  const [showSpin, setShowSpin] = useState(false);
+  const [activeToast, setActiveToast] = useState<{ title: string, desc: string } | null>(null);
+  const [isSpinOpen, setIsSpinOpen] = useState(false);
   const [showInstallModal, setShowInstallModal] = useState(false);
-  const [activeToast, setActiveToast] = useState<{title: string, desc: string} | null>(null);
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const [isIOS, setIsIOS] = useState(false);
-
   const [gameStatus, setGameStatus] = useState<Record<string, boolean>>({
-    'crash-game': true, 'aviator-game': true, 'crazy777-game': true, 'mines-game': true,
-    'penalty-game': true, 'limbo-game': true, 'dice-game': true, 'plinko-game': true
+    'crash-game': true,
+    'aviator-game': true,
+    'crazy777-game': true,
+    'mines-game': true,
+    'penalty-game': true,
+    'limbo-game': true,
+    'dice-game': true,
+    'plinko-game': true
+  });
+  const [settings, setSettings] = useState<any>({
+    crash: 0.1,
+    aviator: 0.1,
+    crazy777: 0.1,
+    mines: 0.1,
+    penalty: 0.1,
+    limbo: 0.1,
+    dice: 0.1,
+    plinko: 0.1
   });
 
-  const [riggingSettings, setRiggingSettings] = useState({
-    crash: 0.5, aviator: 0.5, crazy777: 0.5, mines: 0.5, penalty: 0.5, limbo: 0.4, dice: 0.5, plinko: 0.4, global: 0.3
-  });
-
+  // Handle Supabase Auth Session
   useEffect(() => {
-    const savedLang = localStorage.getItem('appLang') as Language;
-    if (savedLang) setLang(savedLang);
-
-    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
-    setIsIOS(ios);
-
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    });
-
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
+      if (session) {
         setUser(session.user);
-        fetchUserData(session.user.id);
+        fetchProfile(session.user.id);
         setCurrentView('dashboard');
       }
     });
 
-    const fetchSettings = async () => {
-      try {
-        const { data } = await getGlobalSettings();
-        if (data) {
-          setRiggingSettings(data.rigging || riggingSettings);
-          setGameStatus(data.game_status || gameStatus);
-        }
-      } catch (e) {
-        console.error("Settings fetch failed", e);
-      }
-    };
-    fetchSettings();
-
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN') {
-        setUser(session?.user ?? null);
-        setIsDemo(false); // Ensure real user session disables demo mode
-        if (session?.user) fetchUserData(session.user.id);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        setUser(session.user);
+        fetchProfile(session.user.id);
         setCurrentView('dashboard');
-      }
-      if (event === 'SIGNED_OUT') {
+        setIsDemo(false);
+      } else {
         setUser(null);
         setProfile(null);
-        setBalance(0);
-        setCurrentView('login');
-      }
-      if (event === 'PASSWORD_RECOVERY') {
-        setCurrentView('reset-password');
+        if (!isDemo) setCurrentView('login');
       }
     });
 
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
-  }, []);
+    return () => subscription.unsubscribe();
+  }, [isDemo]);
 
-  useEffect(() => {
-    if (!user?.id || isDemo) return;
-
-    const channel = supabase
-      .channel(`profile_realtime_${user.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'profiles',
-          filter: `id=eq.${user.id}`,
-        },
-        (payload) => {
-          const updatedProfile = payload.new;
-          if (updatedProfile) {
-            setProfile(updatedProfile);
-            setBalance(Number(updatedProfile.balance) || 0);
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user?.id, isDemo]);
-
-  const fetchUserData = async (userId: string) => {
-    const { data: profileData } = await getUserProfile(userId);
-    if (profileData) {
-      if (profileData.status === 'blocked') {
-        supabase.auth.signOut();
-        setActiveToast({ title: "Account Blocked", desc: "Please contact support." });
-        return;
-      }
-      setProfile(profileData);
-      setBalance(Number(profileData.balance) || 0);
+  const fetchProfile = async (userId: string) => {
+    const { data } = await getUserProfile(userId);
+    if (data) {
+      setProfile(data);
+      setBalance(Number(data.balance) || 0);
     }
   };
 
-  const handleInstallClick = () => {
-    setShowInstallModal(true);
-  };
+  const navigate = (view: ViewType) => setCurrentView(view);
+  const updateBalance = (newBal: number) => setBalance(newBal);
 
-  const handleNativeInstall = async () => {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') {
-        setDeferredPrompt(null);
-        setShowInstallModal(false);
-      }
-    } else {
-      alert("Installation prompt is currently unavailable.");
-    }
-  };
+  const handleInstallClick = () => setShowInstallModal(true);
 
-  const updateBalance = async (newBalance: number) => {
-    setBalance(newBalance);
-    if (user && !isDemo) {
-      await supabase.from('profiles').update({ balance: newBalance }).eq('id', user.id);
-      // Wait 500ms and re-fetch to ensure local state is 100% correct with DB
-      setTimeout(() => fetchUserData(user.id), 500);
-    }
-  };
+  const onLoginSuccess = () => navigate('dashboard');
 
-  const handleSaveBet = async (data: any) => {
-    if (user && !isDemo) {
-      await saveBetRecord({
-        user_id: user.id,
-        ...data
-      });
-    }
+  const handleBetSave = async (betData: any) => {
+    if (!user || isDemo) return;
+    await saveBetRecord({
+      user_id: user.id,
+      ...betData,
+      created_at: new Date().toISOString()
+    });
+    fetchProfile(user.id);
   };
-
-  const navigate = (view: ViewType) => {
-    if (view.includes('-game') && gameStatus[view] === false) {
-      setActiveToast({ title: "Maintenance", desc: "This game is temporarily unavailable." });
-      setTimeout(() => setActiveToast(null), 3000);
-      return;
-    }
-    setCurrentView(view);
-  };
-
-  const isAuthView = ['login', 'register', 'forgot-password', 'reset-password'].includes(currentView);
-  const isFullScreen = [
-    'crash-game', 'aviator-game', 'crazy777-game', 'mines-game', 'penalty-game', 'limbo-game', 'dice-game', 'plinko-game',
-    'personal-details', 'verification-center', 'change-password', 'edit-profile', 'game-detail',
-    'admin', 'about-us', 'terms', 'privacy', 'my-bets', 'help-support', 'vip-rewards',
-    'forgot-password', 'reset-password', 'deposit', 'withdraw', 'notifications'
-  ].includes(currentView);
 
   return (
-    <div className="h-[100dvh] w-full flex flex-col items-center justify-center bg-[#0d0909] overflow-hidden font-display select-none animate-gpu text-white">
-      <div className={`w-full ${isAuthView ? 'max-w-md' : 'max-w-6xl'} bg-[#1a0d0e] h-full relative flex flex-col overflow-hidden shadow-[0_0_100px_rgba(0,0,0,1)]`}>
+    <div className="flex flex-col h-screen max-w-md mx-auto bg-black text-white relative overflow-hidden font-display shadow-[0_0_100px_rgba(0,0,0,0.5)]">
+      <main className="flex-1 overflow-hidden relative">
+        {currentView === 'login' && <LoginForm lang={lang} onSignUpClick={() => navigate('register')} onForgotClick={() => navigate('forgot-password')} onSuccess={onLoginSuccess} onDemoLogin={() => { setIsDemo(true); setBalance(1000); navigate('dashboard'); }} />}
+        {currentView === 'register' && <RegisterForm lang={lang} onLoginClick={() => navigate('login')} onSuccess={() => navigate('login')} />}
+        {currentView === 'forgot-password' && <ForgotPassword lang={lang} onBack={() => navigate('login')} />}
+        {currentView === 'reset-password' && <ResetPassword lang={lang} onSuccess={() => navigate('login')} />}
         
-        {activeToast && (
-          <div onClick={() => setActiveToast(null)} className="absolute top-6 left-6 right-6 z-[300] animate-in slide-in-from-top duration-500 cursor-pointer">
-             <div className="bg-[#24191a]/95 backdrop-blur-xl border border-primary/30 p-4 rounded-2xl flex items-center gap-4 shadow-2xl">
-                <div className="size-10 rounded-full bg-primary flex items-center justify-center shrink-0">
-                   <span className="material-symbols-outlined text-white text-xl">info</span>
-                </div>
-                <div className="flex-1">
-                   <p className="text-white text-xs font-black uppercase tracking-tight mb-1">{activeToast.title}</p>
-                   <p className="text-slate-400 text-[10px] font-bold leading-tight">{activeToast.desc}</p>
-                </div>
-             </div>
+        {currentView === 'dashboard' && <Dashboard lang={lang} balance={balance} userProfile={profile} onWalletClick={() => navigate('wallet')} onDepositClick={() => navigate('deposit')} onNavigate={navigate} onSpinClick={() => setIsSpinOpen(true)} onNotificationClick={() => navigate('notifications')} />}
+        {currentView === 'sports' && <SportsBetting lang={lang} balance={balance} onMyBetsClick={() => { setHistoryType('bets'); navigate('my-bets'); }} />}
+        {currentView === 'casino' && <LiveCasino lang={lang} balance={balance} onNavigate={navigate} gameStatus={gameStatus} />}
+        {currentView === 'promotions' && <Promotions onNavigate={navigate} />}
+        {currentView === 'wallet' && <Wallet lang={lang} balance={balance} onBack={() => navigate('dashboard')} onDepositClick={() => navigate('deposit')} onWithdrawClick={() => navigate('withdraw')} onHistoryClick={() => { setHistoryType('transactions'); navigate('my-bets'); }} />}
+        {currentView === 'deposit' && <Deposit lang={lang} balance={balance} onBack={() => navigate('wallet')} onDepositSuccess={(amt) => { updateBalance(balance + amt); setActiveToast({ title: "Deposit Successful", desc: `$${amt} has been added to your balance.` }); navigate('wallet'); }} />}
+        {currentView === 'withdraw' && <Withdraw lang={lang} balance={balance} onBack={() => navigate('wallet')} isDemo={isDemo} onWithdrawSuccess={(amt) => { updateBalance(balance - amt); navigate('wallet'); }} />}
+        {currentView === 'notifications' && <Notifications lang={lang} onBack={() => navigate('dashboard')} />}
+        {currentView === 'my-bets' && <MyBets lang={lang} user={user} initialTab={historyType} onBack={() => navigate('dashboard')} onNavigateHome={() => navigate('dashboard')} />}
+        {currentView === 'profile' && <ProfileSettings lang={lang} userProfile={profile} onBack={() => navigate('dashboard')} onLogout={async () => { await supabase.auth.signOut(); navigate('login'); }} onLanguageToggle={() => setLang(lang === 'en' ? 'bn' : 'en')} onEditProfile={() => navigate('edit-profile')} onPersonalDetails={() => navigate('personal-details')} onVerificationCenter={() => navigate('verification-center')} onChangePassword={() => navigate('change-password')} onVipRewards={() => navigate('vip-rewards')} onHelpSupport={() => navigate('help-support')} onAboutUs={() => navigate('about-us')} onTerms={() => navigate('terms')} onPrivacy={() => navigate('privacy')} onAdminPanel={profile?.role === 'admin' ? () => navigate('admin') : undefined} onDownloadApp={handleInstallClick} />}
+        {currentView === 'edit-profile' && <EditProfilePicture user={user} currentAvatar={profile?.avatar_url} onBack={() => navigate('profile')} onUpdate={() => fetchProfile(user.id)} />}
+        {currentView === 'personal-details' && <PersonalDetails user={user} onBack={() => navigate('profile')} />}
+        {currentView === 'verification-center' && <VerificationCenter onBack={() => navigate('profile')} />}
+        {currentView === 'change-password' && <ChangePassword onBack={() => navigate('profile')} />}
+        {currentView === 'vip-rewards' && <VipRewards currentPoints={1200} onBack={() => navigate('profile')} />}
+        {currentView === 'help-support' && <HelpSupport onBack={() => navigate('profile')} />}
+        {currentView === 'about-us' && <AboutUs onBack={() => navigate('profile')} />}
+        {currentView === 'terms' && <TermsConditions onBack={() => navigate('profile')} />}
+        {currentView === 'privacy' && <PrivacyPolicy onBack={() => navigate('profile')} />}
+        {currentView === 'game-detail' && <GameDetail balance={balance} gameId={1} onBack={() => navigate('casino')} />}
+        {currentView === 'mini-games' && <MiniGamesHub onNavigate={navigate} gameStatus={gameStatus} />}
+        
+        {/* Mini Games */}
+        {currentView === 'crash-game' && <CrashGame balance={balance} onUpdateBalance={updateBalance} onSaveBet={handleBetSave} riggingIntensity={settings.crash} onBack={() => navigate('mini-games')} />}
+        {currentView === 'aviator-game' && <AviatorGame balance={balance} onUpdateBalance={updateBalance} onSaveBet={handleBetSave} riggingIntensity={settings.aviator} onBack={() => navigate('mini-games')} />}
+        {currentView === 'crazy777-game' && <Crazy777Game balance={balance} onUpdateBalance={updateBalance} onSaveBet={handleBetSave} riggingIntensity={settings.crazy777} onBack={() => navigate('mini-games')} />}
+        {currentView === 'mines-game' && <MinesGame balance={balance} onUpdateBalance={updateBalance} onSaveBet={handleBetSave} riggingIntensity={settings.mines} onBack={() => navigate('mini-games')} />}
+        {currentView === 'penalty-game' && <PenaltyGame balance={balance} onUpdateBalance={updateBalance} onSaveBet={handleBetSave} riggingIntensity={settings.penalty} onBack={() => navigate('mini-games')} />}
+        {currentView === 'limbo-game' && <LimboGame balance={balance} onUpdateBalance={updateBalance} onSaveBet={handleBetSave} riggingIntensity={settings.limbo} onBack={() => navigate('mini-games')} />}
+        {currentView === 'dice-game' && <DiceGame balance={balance} onUpdateBalance={updateBalance} onSaveBet={handleBetSave} riggingIntensity={settings.dice} onBack={() => navigate('mini-games')} />}
+        {currentView === 'plinko-game' && <PlinkoGame balance={balance} onUpdateBalance={updateBalance} onSaveBet={handleBetSave} riggingIntensity={settings.plinko} onBack={() => navigate('mini-games')} />}
+        
+        {currentView === 'admin' && <AdminPanel settings={settings} onUpdateSettings={setSettings} gameStatus={gameStatus} onUpdateGameStatus={setGameStatus} onBack={() => navigate('profile')} />}
+      </main>
+
+      {!['login', 'register', 'forgot-password', 'reset-password', 'crash-game', 'aviator-game', 'crazy777-game', 'mines-game', 'penalty-game', 'limbo-game', 'dice-game', 'plinko-game', 'admin', 'game-detail', 'edit-profile'].includes(currentView) && (
+        <BottomNav lang={lang} currentView={currentView} onNavigate={navigate} />
+      )}
+
+      {isSpinOpen && <DailySpin onWin={(amt) => { updateBalance(balance + amt); setIsSpinOpen(false); }} onClose={() => setIsSpinOpen(false)} />}
+      {showInstallModal && <InstallAppModal lang={lang} onClose={() => setShowInstallModal(false)} onInstall={() => setShowInstallModal(false)} isIOS={/iPad|iPhone|iPod/.test(navigator.userAgent)} />}
+
+      {/* Toast Notification */}
+      {activeToast && (
+        <div className="fixed top-8 left-6 right-6 bg-emerald-500 text-white p-4 rounded-2xl shadow-2xl z-[500] flex items-center gap-4 animate-in slide-in-from-top">
+          <span className="material-symbols-outlined">check_circle</span>
+          <div className="flex-1">
+            <p className="text-[10px] font-black uppercase tracking-widest">{activeToast.title}</p>
+            <p className="text-xs font-bold">{activeToast.desc}</p>
           </div>
-        )}
-
-        <div className={`flex-1 overflow-y-auto no-scrollbar ${isAuthView ? 'flex flex-col justify-center py-10' : ''}`}>
-          {currentView === 'login' && <LoginForm lang={lang} onSignUpClick={() => navigate('register')} onForgotClick={() => navigate('forgot-password')} onSuccess={() => navigate('dashboard')} onDemoLogin={() => { setIsDemo(true); setBalance(5000); navigate('dashboard'); }} />}
-          {currentView === 'register' && <RegisterForm lang={lang} onLoginClick={() => navigate('login')} onSuccess={() => navigate('dashboard')} />}
-          {currentView === 'forgot-password' && <ForgotPassword lang={lang} onBack={() => navigate('login')} />}
-          {currentView === 'reset-password' && <ResetPassword lang={lang} onSuccess={() => navigate('login')} />}
-          {currentView === 'dashboard' && <Dashboard lang={lang} balance={balance} userProfile={profile} onWalletClick={() => navigate('wallet')} onDepositClick={() => navigate('deposit')} onNavigate={navigate} onSpinClick={() => setShowSpin(true)} onNotificationClick={() => navigate('notifications')} />}
-          {currentView === 'sports' && <SportsBetting lang={lang} balance={balance} globalRigging={riggingSettings.global} onMyBetsClick={() => navigate('my-bets')} />}
-          {currentView === 'casino' && <LiveCasino lang={lang} balance={balance} onNavigate={navigate} gameStatus={gameStatus} />}
-          {currentView === 'game-detail' && <GameDetail balance={balance} gameId={1} onBack={() => navigate('casino')} onUpdateBalance={updateBalance} />}
-          {currentView === 'promotions' && <Promotions onNavigate={navigate} />}
-          {currentView === 'wallet' && <Wallet lang={lang} balance={balance} onBack={() => navigate('dashboard')} onDepositClick={() => navigate('deposit')} onWithdrawClick={() => navigate('withdraw')} onHistoryClick={() => navigate('my-bets')} />}
-          {currentView === 'deposit' && <Deposit lang={lang} balance={balance} onBack={() => navigate('wallet')} onDepositSuccess={(amt) => { 
-            const newBal = balance + amt;
-            updateBalance(newBal); 
-            setActiveToast({ title: "Deposit Successful", desc: `$${amt} has been added to your balance.` });
-            navigate('wallet'); 
-          }} />}
-          {currentView === 'withdraw' && <Withdraw lang={lang} balance={balance} onBack={() => navigate('wallet')} isDemo={isDemo} onWithdrawSuccess={(amt) => { updateBalance(balance - amt); navigate('wallet'); }} />}
-          {currentView === 'notifications' && <Notifications lang={lang} onBack={() => navigate('dashboard')} />}
-          {currentView === 'my-bets' && <MyBets lang={lang} user={user} onBack={() => navigate('dashboard')} onNavigateHome={() => navigate('dashboard')} />}
-          {currentView === 'profile' && <ProfileSettings lang={lang} userProfile={profile} onBack={() => navigate('dashboard')} onLogout={async () => { await supabase.auth.signOut(); navigate('login'); }} onLanguageToggle={() => { setLang(lang === 'en' ? 'bn' : 'en'); }} onEditProfile={() => navigate('edit-profile')} onPersonalDetails={() => navigate('personal-details')} onVerificationCenter={() => navigate('verification-center')} onChangePassword={() => navigate('change-password')} onVipRewards={() => navigate('vip-rewards')} onHelpSupport={() => navigate('help-support')} onAboutUs={() => navigate('about-us')} onTerms={() => navigate('terms')} onPrivacy={() => navigate('privacy')} onAdminPanel={profile?.role === 'admin' ? () => navigate('admin') : undefined} onDownloadApp={handleInstallClick} />}
-          {currentView === 'personal-details' && <PersonalDetails onBack={() => navigate('profile')} user={user} />}
-          {currentView === 'verification-center' && <VerificationCenter onBack={() => navigate('profile')} />}
-          {currentView === 'change-password' && <ChangePassword onBack={() => navigate('profile')} />}
-          {currentView === 'edit-profile' && <EditProfilePicture user={user} currentAvatar={profile?.avatar_url} onBack={() => navigate('profile')} onUpdate={() => user && fetchUserData(user.id)} />}
-          {currentView === 'vip-rewards' && <VipRewards currentPoints={1200} onBack={() => navigate('profile')} />}
-          {currentView === 'help-support' && <HelpSupport onBack={() => navigate('profile')} />}
-          {currentView === 'about-us' && <AboutUs onBack={() => navigate('profile')} />}
-          {currentView === 'terms' && <TermsConditions onBack={() => navigate('profile')} />}
-          {currentView === 'privacy' && <PrivacyPolicy onBack={() => navigate('profile')} />}
-          {currentView === 'admin' && <AdminPanel onBack={() => navigate('profile')} settings={riggingSettings} onUpdateSettings={setRiggingSettings} gameStatus={gameStatus} onUpdateGameStatus={setGameStatus} />}
-          
-          {currentView === 'mini-games' && <MiniGamesHub onNavigate={navigate} gameStatus={gameStatus} />}
-          {currentView === 'crash-game' && <CrashGame balance={balance} onUpdateBalance={updateBalance} onSaveBet={handleSaveBet} riggingIntensity={riggingSettings.crash} onBack={() => navigate('mini-games')} />}
-          {currentView === 'aviator-game' && <AviatorGame balance={balance} onUpdateBalance={updateBalance} onSaveBet={handleSaveBet} riggingIntensity={riggingSettings.aviator} onBack={() => navigate('mini-games')} />}
-          {currentView === 'crazy777-game' && <Crazy777Game balance={balance} onUpdateBalance={updateBalance} onSaveBet={handleSaveBet} riggingIntensity={riggingSettings.crazy777} onBack={() => navigate('mini-games')} />}
-          {currentView === 'mines-game' && <MinesGame balance={balance} onUpdateBalance={updateBalance} onSaveBet={handleSaveBet} riggingIntensity={riggingSettings.mines} onBack={() => navigate('mini-games')} />}
-          {currentView === 'penalty-game' && <PenaltyGame balance={balance} onUpdateBalance={updateBalance} onSaveBet={handleSaveBet} riggingIntensity={riggingSettings.penalty} onBack={() => navigate('mini-games')} />}
-          {currentView === 'limbo-game' && <LimboGame balance={balance} onUpdateBalance={updateBalance} onSaveBet={handleSaveBet} riggingIntensity={riggingSettings.limbo} onBack={() => navigate('mini-games')} />}
-          {currentView === 'dice-game' && <DiceGame balance={balance} onUpdateBalance={updateBalance} onSaveBet={handleSaveBet} riggingIntensity={riggingSettings.dice} onBack={() => navigate('mini-games')} />}
-          {currentView === 'plinko-game' && <PlinkoGame balance={balance} onUpdateBalance={updateBalance} onSaveBet={handleSaveBet} riggingIntensity={riggingSettings.plinko} onBack={() => navigate('mini-games')} />}
+          <button onClick={() => setActiveToast(null)}><span className="material-symbols-outlined">close</span></button>
         </div>
-
-        {showSpin && <DailySpin onWin={(amt) => updateBalance(balance + amt)} onClose={() => setShowSpin(false)} />}
-        
-        {showInstallModal && <InstallAppModal lang={lang} onClose={() => setShowInstallModal(false)} onInstall={handleNativeInstall} isIOS={isIOS} />}
-
-        {!isAuthView && !isFullScreen && <BottomNav lang={lang} currentView={currentView} onNavigate={navigate} />}
-      </div>
+      )}
     </div>
   );
 };

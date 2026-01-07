@@ -18,7 +18,7 @@ const Dashboard: React.FC<DashboardProps> = ({ lang, balance, userProfile, onWal
   const userName = userProfile?.first_name || "User";
 
   return (
-    <div className="flex flex-col h-full animate-in fade-in duration-500 bg-[#1a0d0e] no-scrollbar pb-24 font-display">
+    <div className="flex flex-col h-full animate-in fade-in duration-500 bg-[#1a0d0e] overflow-y-auto no-scrollbar pb-32 font-display">
       
       {/* Header */}
       <header className="sticky top-0 z-50 bg-[#1a0d0e]/95 backdrop-blur-md px-5 py-4 flex items-center justify-between border-b border-white/5">
@@ -39,7 +39,7 @@ const Dashboard: React.FC<DashboardProps> = ({ lang, balance, userProfile, onWal
           </div>
         </div>
         <div className="flex items-center gap-3">
-            <button onClick={() => onNavigate('notifications')} className="size-10 rounded-full bg-white/5 flex items-center justify-center text-slate-400 relative">
+            <button onClick={() => onNotificationClick?.()} className="size-10 rounded-full bg-white/5 flex items-center justify-center text-slate-400 relative">
                <span className="material-symbols-outlined">notifications</span>
                <span className="absolute top-2.5 right-2.5 size-2 bg-primary rounded-full border-2 border-[#1a0d0e]"></span>
             </button>
