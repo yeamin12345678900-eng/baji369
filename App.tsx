@@ -100,6 +100,7 @@ const App: React.FC = () => {
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN') {
         setUser(session?.user ?? null);
+        setIsDemo(false); // Ensure real user session disables demo mode
         if (session?.user) fetchUserData(session.user.id);
         setCurrentView('dashboard');
       }
@@ -247,7 +248,7 @@ const App: React.FC = () => {
             setActiveToast({ title: "Deposit Successful", desc: `$${amt} has been added to your balance.` });
             navigate('wallet'); 
           }} />}
-          {currentView === 'withdraw' && <Withdraw lang={lang} balance={balance} onBack={() => navigate('wallet')} onWithdrawSuccess={(amt) => { updateBalance(balance - amt); navigate('wallet'); }} />}
+          {currentView === 'withdraw' && <Withdraw lang={lang} balance={balance} onBack={() => navigate('wallet')} isDemo={isDemo} onWithdrawSuccess={(amt) => { updateBalance(balance - amt); navigate('wallet'); }} />}
           {currentView === 'notifications' && <Notifications lang={lang} onBack={() => navigate('dashboard')} />}
           {currentView === 'my-bets' && <MyBets lang={lang} user={user} onBack={() => navigate('dashboard')} onNavigateHome={() => navigate('dashboard')} />}
           {currentView === 'profile' && <ProfileSettings lang={lang} userProfile={profile} onBack={() => navigate('dashboard')} onLogout={async () => { await supabase.auth.signOut(); navigate('login'); }} onLanguageToggle={() => { setLang(lang === 'en' ? 'bn' : 'en'); }} onEditProfile={() => navigate('edit-profile')} onPersonalDetails={() => navigate('personal-details')} onVerificationCenter={() => navigate('verification-center')} onChangePassword={() => navigate('change-password')} onVipRewards={() => navigate('vip-rewards')} onHelpSupport={() => navigate('help-support')} onAboutUs={() => navigate('about-us')} onTerms={() => navigate('terms')} onPrivacy={() => navigate('privacy')} onAdminPanel={profile?.role === 'admin' ? () => navigate('admin') : undefined} onDownloadApp={handleInstallClick} />}

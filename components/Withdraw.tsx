@@ -8,9 +8,10 @@ interface WithdrawProps {
   balance: number;
   onBack: () => void;
   onWithdrawSuccess: (amount: number) => void;
+  isDemo?: boolean;
 }
 
-const Withdraw: React.FC<WithdrawProps> = ({ lang, balance, onBack, onWithdrawSuccess }) => {
+const Withdraw: React.FC<WithdrawProps> = ({ lang, balance, onBack, onWithdrawSuccess, isDemo = false }) => {
   const [selectedMethod, setSelectedMethod] = useState('BKASH');
   const [amount, setAmount] = useState<string>('');
   const [phone, setPhone] = useState('');
@@ -28,6 +29,11 @@ const Withdraw: React.FC<WithdrawProps> = ({ lang, balance, onBack, onWithdrawSu
   ];
 
   const handleWithdraw = async () => {
+    if (isDemo) {
+      alert(lang === 'en' ? "Withdrawal is not available in Demo Mode. Please log in with a real account." : "ডেমো মোডে উইথড্র করা সম্ভব নয়। দয়া করে রিয়েল অ্যাকাউন্টে লগইন করুন।");
+      return;
+    }
+
     const numAmount = parseFloat(amount);
     
     if (!amount || numAmount < 50) {
@@ -45,7 +51,10 @@ const Withdraw: React.FC<WithdrawProps> = ({ lang, balance, onBack, onWithdrawSu
       return;
     }
 
-    if (!user) return;
+    if (!user) {
+      alert(lang === 'en' ? "User session not found. Please log in again." : "ইউজার সেশন পাওয়া যায়নি। আবার লগইন করুন।");
+      return;
+    }
     
     setIsProcessing(true);
     try {
@@ -72,10 +81,21 @@ const Withdraw: React.FC<WithdrawProps> = ({ lang, balance, onBack, onWithdrawSu
       </header>
 
       <main className="flex-1 pb-32">
+        {isDemo && (
+          <section className="px-5 mt-4">
+             <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-2xl flex items-center gap-3">
+                <span className="material-symbols-outlined text-red-500 animate-pulse">warning</span>
+                <p className="text-[10px] text-red-400 font-black uppercase tracking-widest leading-tight">
+                  {lang === 'en' ? "DEMO MODE ACTIVE: Real withdrawals are disabled." : "ডেমো মোড চালু: আসল টাকা উত্তোলন বন্ধ আছে।"}
+                </p>
+             </div>
+          </section>
+        )}
+
         <section className="px-5 pt-6 pb-2">
             <div className="flex flex-col items-center justify-center gap-2 rounded-[2.5rem] bg-gradient-to-br from-[#1a0d0e] to-black border border-white/5 p-8 shadow-2xl relative overflow-hidden group">
-                <p className="text-slate-500 text-[10px] font-black tracking-[0.2em] uppercase">Withdrawable Balance</p>
-                <p className="text-white tracking-tight text-4xl font-black italic tabular-nums">${balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                <p className="text-slate-500 text-[10px] font-black tracking-[0.2em] uppercase">{isDemo ? 'Demo Balance' : 'Withdrawable Balance'}</p>
+                <p className={`tracking-tight text-4xl font-black italic tabular-nums ${isDemo ? 'text-amber-500' : 'text-white'}`}>${balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
             </div>
         </section>
 
@@ -141,7 +161,7 @@ const Withdraw: React.FC<WithdrawProps> = ({ lang, balance, onBack, onWithdrawSu
             <div className="flex items-start gap-4 p-5 bg-primary/5 border border-primary/10 rounded-2xl">
                 <span className="material-symbols-outlined text-primary">info</span>
                 <p className="text-[10px] text-slate-400 leading-relaxed font-bold uppercase tracking-tight">
-                    উইথড্র রিকোয়েস্ট দেওয়ার পর অ্যাডমিন আপনার তথ্য যাচাই করে ২৪ ঘণ্টার মধ্যে পেমেন্ট পাঠিয়ে দিবে। দয়া করে সঠিক নাম্বার দিন।
+                    {lang === 'en' ? "Admin will verify your identity and send payment within 24 hours. Please ensure your number is correct." : "উইথড্র রিকোয়েস্ট দেওয়ার পর অ্যাডমিন আপনার তথ্য যাচাই করে ২৪ ঘণ্টার মধ্যে পেমেন্ট পাঠিয়ে দিবে। দয়া করে সঠিক নাম্বার দিন।"}
                 </p>
             </div>
         </section>
@@ -150,15 +170,15 @@ const Withdraw: React.FC<WithdrawProps> = ({ lang, balance, onBack, onWithdrawSu
       <footer className="fixed bottom-0 left-0 right-0 p-6 bg-[#0d0909]/95 backdrop-blur-xl border-t border-white/5 z-50">
         <button 
             onClick={handleWithdraw}
-            disabled={isProcessing || !amount || parseFloat(amount) < 50 || parseFloat(amount) > balance}
+            disabled={isProcessing || !amount || parseFloat(amount) < 50 || parseFloat(amount) > balance || isDemo}
             className={`w-full h-16 rounded-2xl bg-primary text-white text-sm font-black uppercase tracking-[0.2em] shadow-xl shadow-primary/20 transition-all active:scale-[0.98] ${
-                isProcessing || !amount || parseFloat(amount) < 50 || parseFloat(amount) > balance ? 'opacity-30 cursor-not-allowed' : 'hover:brightness-110'
+                isProcessing || !amount || parseFloat(amount) < 50 || parseFloat(amount) > balance || isDemo ? 'opacity-30 cursor-not-allowed' : 'hover:brightness-110'
             }`}
         >
             {isProcessing ? (
                 <div className="size-6 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto"></div>
             ) : (
-                "CONFIRM WITHDRAWAL"
+                isDemo ? "DISABLED IN DEMO" : "CONFIRM WITHDRAWAL"
             )}
         </button>
       </footer>
