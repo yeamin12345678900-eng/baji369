@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { supabase, getAllUsers, adminUpdateUser, updateGlobalSettings, getPlatformActivity, broadcastNotification, getPendingTransactions, updateTransactionStatus, getPendingWithdrawals, updateWithdrawStatus } from '../services/supabase';
+import { supabase, getAllUsers, adminUpdateUser, updateGlobalSettings, getPlatformActivity, broadcastNotification, getPendingTransactions, updateTransactionStatus, getPendingWithdrawals, updateWithdrawStatus, getGlobalSettings } from '../services/supabase';
 
 interface AdminPanelProps {
   onBack: () => void;
@@ -17,12 +17,20 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
   const [pendingWithdraws, setPendingWithdraws] = useState<any[]>([]);
   const [stats, setStats] = useState({ totalStakes: 0, totalPayouts: 0, netProfit: 0, totalBets: 0, activeUsers: 0 });
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'rigging' | 'games' | 'users' | 'activity' | 'broadcast' | 'reports' | 'deposits' | 'withdrawals'>('reports');
+  const [activeTab, setActiveTab] = useState<'rigging' | 'games' | 'users' | 'activity' | 'broadcast' | 'reports' | 'deposits' | 'withdrawals' | 'payments'>('reports');
   const [searchQuery, setSearchQuery] = useState('');
   
   const [notifTitle, setNotifTitle] = useState('');
   const [notifMsg, setNotifMsg] = useState('');
   const [isBroadcasting, setIsBroadcasting] = useState(false);
+
+  // Payment Numbers State
+  const [paymentNumbers, setPaymentNumbers] = useState({
+    bkash: '01700000000',
+    nagad: '01700000000',
+    rocket: '01700000000'
+  });
+  const [isSavingPayments, setIsSavingPayments] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -43,6 +51,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
       const { data: withdraws } = await getPendingWithdrawals();
       if (withdraws) setPendingWithdraws(withdraws);
 
+      const { data: globalSets, error: fetchErr } = await getGlobalSettings();
+      if (globalSets?.payment_numbers) {
+        setPaymentNumbers(globalSets.payment_numbers);
+      } else {
+        console.warn("No payment numbers found in settings, using defaults.");
+      }
+
       const { data: bets } = await supabase.from('bets').select('*');
       if (bets) {
         const totalStakes = bets.reduce((sum, b) => sum + Number(b.stake), 0);
@@ -57,6 +72,20 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
       console.error("Admin fetch error", err);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSavePayments = async () => {
+    setIsSavingPayments(true);
+    try {
+      const { error } = await updateGlobalSettings({ payment_numbers: paymentNumbers });
+      if (error) throw error;
+      alert("Success: Merchant numbers updated and synchronized!");
+    } catch (err: any) {
+      console.error("Save Error:", err);
+      alert(`Error: ${err.message || "Failed to update numbers. Check SQL Console."}`);
+    } finally {
+      setIsSavingPayments(false);
     }
   };
 
@@ -127,12 +156,51 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
 
       <div className="flex-1 overflow-y-auto no-scrollbar p-6 space-y-6 pb-32">
         <div className="flex bg-white/5 p-1 rounded-2xl border border-white/10 overflow-x-auto no-scrollbar gap-1">
-           {['reports', 'deposits', 'withdrawals', 'rigging', 'broadcast', 'activity', 'users', 'games'].map((t) => (
+           {['reports', 'deposits', 'withdrawals', 'payments', 'rigging', 'broadcast', 'activity', 'users', 'games'].map((t) => (
              <button key={t} onClick={() => setActiveTab(t as any)} className={`shrink-0 px-5 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${activeTab === t ? 'bg-primary text-white shadow-lg' : 'text-slate-500'}`}>{t}</button>
            ))}
         </div>
 
-        {/* WITHDRAWAL REQUESTS TAB */}
+        {/* PAYMENT SETTINGS TAB */}
+        {activeTab === 'payments' && (
+          <div className="space-y-6 animate-in slide-in-from-bottom">
+            <div className="bg-[#1a0d0e] p-6 rounded-[2.5rem] border border-white/5 space-y-5 shadow-xl">
+               <h3 className="text-white font-black text-sm uppercase px-1">Merchant Numbers</h3>
+               
+               <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-2">bKash Personal/Merchant</label>
+                    <input value={paymentNumbers.bkash} onChange={e => setPaymentNumbers({...paymentNumbers, bkash: e.target.value})} className="w-full h-14 bg-white/5 border border-white/10 rounded-2xl px-5 text-white font-bold outline-none focus:border-pink-500 transition-all" placeholder="01XXXXXXXXX" />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-2">Nagad Personal/Merchant</label>
+                    <input value={paymentNumbers.nagad} onChange={e => setPaymentNumbers({...paymentNumbers, nagad: e.target.value})} className="w-full h-14 bg-white/5 border border-white/10 rounded-2xl px-5 text-white font-bold outline-none focus:border-orange-500 transition-all" placeholder="01XXXXXXXXX" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-2">Rocket Personal/Merchant</label>
+                    <input value={paymentNumbers.rocket} onChange={e => setPaymentNumbers({...paymentNumbers, rocket: e.target.value})} className="w-full h-14 bg-white/5 border border-white/10 rounded-2xl px-5 text-white font-bold outline-none focus:border-purple-500 transition-all" placeholder="01XXXXXXXXX" />
+                  </div>
+               </div>
+
+               <button onClick={handleSavePayments} disabled={isSavingPayments} className="w-full h-16 bg-emerald-500 text-white rounded-[2rem] font-black uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all flex items-center justify-center gap-3">
+                  {isSavingPayments ? <div className="size-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : (
+                    <>
+                      <span className="material-symbols-outlined">save</span>
+                      UPDATE NUMBERS
+                    </>
+                  )}
+               </button>
+            </div>
+            
+            <div className="p-5 bg-blue-500/5 border border-blue-500/20 rounded-2xl">
+               <p className="text-[10px] text-blue-400 font-bold leading-relaxed">১. উপরে SQL কোডটি অবশ্যই একবার রান করবেন। ২. নাম্বার সেভ করার পর একবার ব্রাউজার রিফ্রেশ দিবেন।</p>
+            </div>
+          </div>
+        )}
+
+        {/* REST OF THE TABS (REMAINS SAME AS PREVIOUS) */}
         {activeTab === 'withdrawals' && (
           <div className="space-y-4 animate-in slide-in-from-bottom">
             <h3 className="text-white font-black text-sm uppercase px-2">Withdrawals ({pendingWithdraws.length})</h3>
@@ -162,7 +230,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
           </div>
         )}
 
-        {/* DEPOSIT REQUESTS TAB */}
         {activeTab === 'deposits' && (
           <div className="space-y-4 animate-in slide-in-from-bottom">
             <h3 className="text-white font-black text-sm uppercase px-2">Deposits ({pendingDeposits.length})</h3>
@@ -192,7 +259,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
           </div>
         )}
 
-        {/* FINANCIAL REPORTS TAB */}
         {activeTab === 'reports' && (
            <div className="space-y-6 animate-in slide-in-from-bottom duration-500">
               <div className="grid grid-cols-2 gap-4">
@@ -217,7 +283,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, settings, onUpdateSetti
            </div>
         )}
 
-        {/* BROADCAST TAB */}
         {activeTab === 'broadcast' && (
            <div className="space-y-4 animate-in slide-in-from-bottom duration-500">
               <div className="bg-[#1a0d0e] p-6 rounded-[2.5rem] border border-white/5 space-y-4 shadow-xl">

@@ -144,12 +144,13 @@ export const updateTransactionStatus = async (transactionId: string, status: 'ap
 // --- OTHERS ---
 
 export const getGlobalSettings = async () => {
-  const { data, error } = await supabase.from('settings').select('*').single();
+  const { data, error } = await supabase.from('settings').select('*').limit(1).maybeSingle();
   return { data, error };
 };
 
 export const updateGlobalSettings = async (updates: any) => {
-  const { data, error } = await supabase.from('settings').update(updates).eq('id', 1);
+  // Use upsert to ensure row 1 exists or is created
+  const { data, error } = await supabase.from('settings').upsert({ id: 1, ...updates }).select();
   return { data, error };
 };
 

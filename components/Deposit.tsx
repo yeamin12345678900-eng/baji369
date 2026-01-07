@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Language, translations } from '../services/translations';
-import { supabase, submitDepositRequest } from '../services/supabase';
+import { supabase, submitDepositRequest, getGlobalSettings } from '../services/supabase';
 
 interface DepositProps {
   lang: Language;
@@ -22,14 +22,28 @@ const Deposit: React.FC<DepositProps> = ({ lang, balance, onBack, onDepositSucce
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [copied, setCopied] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [paymentNumbers, setPaymentNumbers] = useState({
+    bkash: '01700000000',
+    nagad: '01700000000',
+    rocket: '01700000000'
+  });
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user));
+    
+    // Fetch dynamic numbers from settings
+    const fetchNumbers = async () => {
+      const { data } = await getGlobalSettings();
+      if (data?.payment_numbers) {
+        setPaymentNumbers(data.payment_numbers);
+      }
+    };
+    fetchNumbers();
   }, []);
 
   const handleCopy = () => {
-    // You can replace this number with your actual merchant/personal number
-    navigator.clipboard.writeText("01700000000"); 
+    const numToCopy = paymentNumbers[provider] || "01700000000";
+    navigator.clipboard.writeText(numToCopy); 
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -184,7 +198,7 @@ const Deposit: React.FC<DepositProps> = ({ lang, balance, onBack, onDepositSucce
                      <div className="p-6 bg-black/60 border border-white/10 rounded-2xl flex items-center justify-between">
                         <div>
                            <p className="text-slate-500 text-[8px] font-black uppercase tracking-widest">{t.merchantNo}</p>
-                           <p className="text-white text-xl font-black tracking-[0.2em] mt-1">01700000000</p>
+                           <p className="text-white text-xl font-black tracking-[0.2em] mt-1">{paymentNumbers[provider]}</p>
                         </div>
                         <button 
                           onClick={handleCopy}
