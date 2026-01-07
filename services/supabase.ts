@@ -1,16 +1,9 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-const getEnv = (key: string) => {
-  if (typeof import.meta !== 'undefined' && (import.meta as any).env?.[key]) return (import.meta as any).env[key];
-  if (typeof process !== 'undefined' && process.env?.[key]) return process.env[key];
-  return undefined;
-};
-
-const SUPABASE_URL = getEnv('VITE_SUPABASE_URL') || 'https://anwivgcqxakbyajfueth.supabase.co';
-const SUPABASE_ANON_KEY = getEnv('VITE_SUPABASE_ANON_KEY') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFud2l2Z2NxeGFrYnlhamZ1ZXRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjczMzgxNDAsImV4cCI6MjA4MjkxNDE0MH0.BS_S6f9330G0wcx9X67ZbySxkIKuGBz5gh0tk13Z4eE';
-
-export const RUPANTOR_API_KEY = 'o8qWkbWQBg6EuF03LP3WvfM5lH860GxnWPvGXVw8sz1wUyyQwc';
+// Fallback to static strings if env is not populated correctly in some environments
+const SUPABASE_URL = (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_URL) || 'https://anwivgcqxakbyajfueth.supabase.co';
+const SUPABASE_ANON_KEY = (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_ANON_KEY) || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFud2l2Z2NxeGFrYnlhamZ1ZXRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjczMzgxNDAsImV4cCI6MjA4MjkxNDE0MH0.BS_S6f9330G0wcx9X67ZbySxkIKuGBz5gh0tk13Z4eE';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -31,13 +24,11 @@ export const updateUserProfile = async (userId: string, updates: any) => {
 // --- WITHDRAWAL LOGIC ---
 
 export const submitWithdrawRequest = async (userId: string, amount: number, method: string, phone: string) => {
-  // 1. Get current profile to check balance
   const { data: profile } = await getUserProfile(userId);
   if (!profile || Number(profile.balance) < amount) {
     throw new Error("Insufficient balance");
   }
 
-  // 2. Create withdrawal record
   const { error: transError } = await supabase.from('transactions').insert([{
     user_id: userId,
     amount: amount,
@@ -51,7 +42,6 @@ export const submitWithdrawRequest = async (userId: string, amount: number, meth
 
   if (transError) throw transError;
 
-  // 3. Deduct balance immediately
   const newBalance = Number(profile.balance) - amount;
   return await updateUserProfile(userId, { balance: newBalance });
 };
@@ -66,7 +56,6 @@ export const getPendingWithdrawals = async () => {
 };
 
 export const updateWithdrawStatus = async (transactionId: string, status: 'approved' | 'rejected', userId: string, amount: number) => {
-  // 1. Update status
   const { error: transError } = await supabase
     .from('transactions')
     .update({ status })
@@ -74,7 +63,6 @@ export const updateWithdrawStatus = async (transactionId: string, status: 'appro
 
   if (transError) throw transError;
 
-  // 2. If rejected, refund balance
   if (status === 'rejected') {
     const { data: profile } = await getUserProfile(userId);
     if (profile) {

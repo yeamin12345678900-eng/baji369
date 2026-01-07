@@ -6,32 +6,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Baji369 | Online Casino & Sports Betting Portal</title>
 
-  <!-- SEO Meta Tags -->
-  <meta name="description" content="Baji369 Pro - The most trusted online casino and sports betting platform. Experience real-time betting, live casino games, and premium rewards.">
-  <meta name="keywords" content="Baji369, Baji 369, Casino, Sports Betting, Online Gaming, Bangladesh Casino, Slot Games">
-  <meta name="author" content="Baji369 Pro">
-  <meta name="robots" content="index, follow">
-  
-  <!-- Open Graph / Facebook -->
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="https://baji369-v9mlvercel.app/">
-  <meta property="og:title" content="Baji369 | Elite Gaming Portal">
-  <meta property="og:description" content="Join the most secure gaming platform. Instant deposits and withdrawals.">
-  <meta property="og:image" content="https://lh3.googleusercontent.com/aida-public/AB6AXuBXa0BkcB9gQbwl-vQ4hdb9jaj2O2rijR7o_tN8xda21OF9HpWw3BBKSf3FClVmp3reyg5we2-NSHKnS8liM_3hwixelqsLsb2g8eyMi4nvTwv69qzyzP3bLMiA8MSo4IMF5QTdVsaABr5ScU-Xgo7y8l32dJI9MmvVFoClaJwW-Jwb2tuSXuzJRRNc4BzKlfs_j5xfTXRo3J8L5M_VOa89jfJMrwp-CLpIJPTP10x7E5WXx27JZ7M3XX_PuRjRIPp_eZ16QZbw">
-
-  <!-- PWA Meta Tags -->
+  <!-- SEO & Social Meta Tags -->
+  <meta name="description" content="Baji369 Pro - The most trusted online casino and sports betting platform.">
   <meta name="theme-color" content="#1a0d0e">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Baji369 Pro">
+  
   <link rel="manifest" href="manifest.json">
   
   <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
   <link href="https://fonts.googleapis.com/css2?family=Spline+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
-  
-  <!-- Paddle SDK -->
-  <script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
 
   <script>
     tailwind.config = {
@@ -50,17 +35,14 @@
           borderRadius: {
             "DEFAULT": "1rem",
             "lg": "2rem",
-            "xl": "3rem",
-            "full": "9999px"
+            "xl": "3rem"
           },
         },
       },
     }
   </script>
   <style>
-    .material-symbols-outlined {
-      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-    }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
     body {
       min-height: 100dvh;
       overflow-x: hidden;
@@ -68,15 +50,10 @@
       -webkit-tap-highlight-color: transparent;
       user-select: none;
     }
-    .animate-gpu {
-      transform: translate3d(0, 0, 0);
-      backface-visibility: hidden;
-      perspective: 1000px;
-    }
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   </style>
-<script type="importmap">
+  <script type="importmap">
 {
   "imports": {
     "react": "https://esm.sh/react@19.0.0",
@@ -86,14 +63,34 @@
     "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
     "@google/genai": "https://esm.sh/@google/genai@1.34.0",
     "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.45.0",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
-    "vite": "https://esm.sh/vite@^7.3.0"
+    "vite": "https://esm.sh/vite@^7.3.1",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2"
   }
 }
 </script>
 </head>
 <body class="font-display bg-background-dark text-white antialiased">
   <div id="root"></div>
+  
+  <!-- Service Worker Handling: Defensive script to clear problematic workers without crashing -->
+  <script>
+    try {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for(let registration of registrations) {
+            registration.unregister().catch(function(e) {
+              console.warn('SW unregister failed:', e);
+            });
+          }
+        }).catch(function(err) {
+          console.warn('Could not get SW registrations:', err);
+        });
+      }
+    } catch (error) {
+      console.error('Service worker management error:', error);
+    }
+  </script>
+
   <script type="module" src="index.tsx"></script>
 </body>
 </html>
